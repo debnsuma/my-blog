@@ -1,0 +1,65 @@
+[
+  {
+    "objectID": "about.html",
+    "href": "about.html",
+    "title": "About",
+    "section": "",
+    "text": "TBA"
+  },
+  {
+    "objectID": "posts/distributed-training-from-scratch/index.html",
+    "href": "posts/distributed-training-from-scratch/index.html",
+    "title": "Distributed Training From Scratch",
+    "section": "",
+    "text": "Distributed training has become essential for training large-scale deep learning models. In this post, we’ll explore the fundamentals of distributed training and implement key concepts from scratch."
+  },
+  {
+    "objectID": "posts/distributed-training-from-scratch/index.html#introduction",
+    "href": "posts/distributed-training-from-scratch/index.html#introduction",
+    "title": "Distributed Training From Scratch",
+    "section": "",
+    "text": "Distributed training has become essential for training large-scale deep learning models. In this post, we’ll explore the fundamentals of distributed training and implement key concepts from scratch."
+  },
+  {
+    "objectID": "posts/distributed-training-from-scratch/index.html#why-distributed-training",
+    "href": "posts/distributed-training-from-scratch/index.html#why-distributed-training",
+    "title": "Distributed Training From Scratch",
+    "section": "Why Distributed Training?",
+    "text": "Why Distributed Training?\nAs models grow larger and datasets expand, training on a single GPU becomes impractical. Distributed training allows us to:\n\nScale training across multiple GPUs or machines\nReduce training time significantly\nHandle larger models that don’t fit in single GPU memory\nProcess larger batch sizes for better convergence"
+  },
+  {
+    "objectID": "posts/distributed-training-from-scratch/index.html#core-concepts",
+    "href": "posts/distributed-training-from-scratch/index.html#core-concepts",
+    "title": "Distributed Training From Scratch",
+    "section": "Core Concepts",
+    "text": "Core Concepts\n\nData Parallelism\nThe most common approach where each device holds a complete copy of the model and processes different batches of data.\n\n\nModel Parallelism\nSplitting the model itself across multiple devices, necessary when the model is too large for a single device.\n\n\nGradient Synchronization\nThe key challenge in distributed training is synchronizing gradients across all devices to ensure consistent model updates."
+  },
+  {
+    "objectID": "posts/distributed-training-from-scratch/index.html#implementation-approaches",
+    "href": "posts/distributed-training-from-scratch/index.html#implementation-approaches",
+    "title": "Distributed Training From Scratch",
+    "section": "Implementation Approaches",
+    "text": "Implementation Approaches\nWe’ll explore several approaches to distributed training:\n\nAllReduce - Efficient gradient aggregation\nParameter Server - Centralized coordination\nRing AllReduce - Bandwidth-optimal communication"
+  },
+  {
+    "objectID": "posts/distributed-training-from-scratch/index.html#coming-soon",
+    "href": "posts/distributed-training-from-scratch/index.html#coming-soon",
+    "title": "Distributed Training From Scratch",
+    "section": "Coming Soon",
+    "text": "Coming Soon\nIn the following sections, we’ll implement these concepts from scratch using PyTorch and explore:\n\nCommunication primitives\nGradient aggregation strategies\nFault tolerance mechanisms\nPerformance optimization techniques\n\nStay tuned for detailed implementations and benchmarks!"
+  },
+  {
+    "objectID": "posts/distributed-training-from-scratch/index.html#references",
+    "href": "posts/distributed-training-from-scratch/index.html#references",
+    "title": "Distributed Training From Scratch",
+    "section": "References",
+    "text": "References\n\nPyTorch Distributed\nHorovod\nDeepSpeed"
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "My Blog",
+    "section": "",
+    "text": "Distributed Training From Scratch\n\n\nA comprehensive guide to understanding and implementing distributed training for deep learning models from first principles\n\n\n\n\n\nNov 15, 2025\n\n\nSuman Debnath\n\n\n\n\n\nNo matching items"
+  }
+]

@@ -1,0 +1,9 @@
+---
+title: "My Blog"
+listing:
+  - id: posts
+    contents: posts/*/index.qmd
+    type: default
+    sort: "date desc"
+---
+

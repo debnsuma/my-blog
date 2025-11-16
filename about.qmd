@@ -1,0 +1,19 @@
+---
+title: "About"
+image: Suman-AIE.jpg
+about:
+  template: jolla
+  links:
+    - icon: twitter
+      text: Twitter
+      href: https://x.com/_sumand
+    - icon: linkedin
+      text: LinkedIn
+      href: https://www.linkedin.com/in/suman-d/
+    - icon: github
+      text: Github
+      href: https://github.com/debnsuma
+
+---
+
+TBA

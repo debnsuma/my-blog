@@ -1,0 +1,24 @@
+project:
+  type: website
+  output-dir: docs
+
+website:
+  description: "A blog built with Quarto"
+  site-url: https://debnsuma.github.io/my-blog
+  title: "My Blog"
+  navbar:
+    right:
+      - about.qmd
+      - icon: github
+        href: https://github.com/debnsuma
+      - icon: twitter
+        href: https://x.com/_sumand
+format:
+  html:
+    theme:
+      - cosmo
+      - brand
+    css: styles.css
+
+
+

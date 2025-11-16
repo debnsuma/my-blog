@@ -1,0 +1,61 @@
+---
+title: "Distributed Training From Scratch"
+author: "Suman Debnath"
+date: "2025-11-15"
+categories: [machine-learning, distributed-systems, deep-learning, ray]
+image: "ray.jpg"
+toc: true
+description: "A comprehensive guide to understanding and implementing distributed training for deep learning models from first principles"
+---
+
+## Introduction
+
+Distributed training has become essential for training large-scale deep learning models. In this post, we'll explore the fundamentals of distributed training and implement key concepts from scratch.
+
+## Why Distributed Training?
+
+As models grow larger and datasets expand, training on a single GPU becomes impractical. Distributed training allows us to:
+
+- **Scale training across multiple GPUs or machines**
+- **Reduce training time significantly**
+- **Handle larger models that don't fit in single GPU memory**
+- **Process larger batch sizes for better convergence**
+
+## Core Concepts
+
+### Data Parallelism
+
+The most common approach where each device holds a complete copy of the model and processes different batches of data.
+
+### Model Parallelism
+
+Splitting the model itself across multiple devices, necessary when the model is too large for a single device.
+
+### Gradient Synchronization
+
+The key challenge in distributed training is synchronizing gradients across all devices to ensure consistent model updates.
+
+## Implementation Approaches
+
+We'll explore several approaches to distributed training:
+
+1. **AllReduce** - Efficient gradient aggregation
+2. **Parameter Server** - Centralized coordination
+3. **Ring AllReduce** - Bandwidth-optimal communication
+
+## Coming Soon
+
+In the following sections, we'll implement these concepts from scratch using PyTorch and explore:
+
+- Communication primitives
+- Gradient aggregation strategies
+- Fault tolerance mechanisms
+- Performance optimization techniques
+
+Stay tuned for detailed implementations and benchmarks!
+
+## References
+
+- [PyTorch Distributed](https://pytorch.org/docs/stable/distributed.html)
+- [Horovod](https://github.com/horovod/horovod)
+- [DeepSpeed](https://www.deepspeed.ai/)
