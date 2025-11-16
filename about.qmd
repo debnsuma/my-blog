@@ -1,6 +1,6 @@
 ---
 title: "About"
-image: Suman-AIE.jpg
+image: profile.jpg
 about:
   template: jolla
   links:
