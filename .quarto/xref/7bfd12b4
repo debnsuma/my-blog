@@ -1,1 +1,1 @@
-{"entries":[],"headings":["introduction","why-distributed-training","core-concepts","data-parallelism","model-parallelism","gradient-synchronization","implementation-approaches","coming-soon","references"]}
+{"entries":[],"headings":["introduction","deep-learning-training-basics","bottlenecks-in-single-gpu-training","static-memory","dynamic-memory","batch-size-intuition","memory-usage-in-transformer","solution-1-activation-recomputation"]}

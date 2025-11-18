@@ -23,6 +23,41 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
@@ -72,6 +107,35 @@ ul.task-list li input[type="checkbox"] {
   }
 }</script>
 
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
 
 <link rel="stylesheet" href="../../styles.css">
 </head>
@@ -165,16 +229,17 @@ ul.task-list li input[type="checkbox"] {
    
   <ul>
   <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
-  <li><a href="#why-distributed-training" id="toc-why-distributed-training" class="nav-link" data-scroll-target="#why-distributed-training">Why Distributed Training?</a></li>
-  <li><a href="#core-concepts" id="toc-core-concepts" class="nav-link" data-scroll-target="#core-concepts">Core Concepts</a>
+  <li><a href="#deep-learning-training-basics" id="toc-deep-learning-training-basics" class="nav-link" data-scroll-target="#deep-learning-training-basics">Deep Learning Training Basics</a></li>
+  <li><a href="#bottlenecks-in-single-gpu-training" id="toc-bottlenecks-in-single-gpu-training" class="nav-link" data-scroll-target="#bottlenecks-in-single-gpu-training">Bottlenecks in Single-GPU Training</a>
   <ul class="collapse">
-  <li><a href="#data-parallelism" id="toc-data-parallelism" class="nav-link" data-scroll-target="#data-parallelism">Data Parallelism</a></li>
-  <li><a href="#model-parallelism" id="toc-model-parallelism" class="nav-link" data-scroll-target="#model-parallelism">Model Parallelism</a></li>
-  <li><a href="#gradient-synchronization" id="toc-gradient-synchronization" class="nav-link" data-scroll-target="#gradient-synchronization">Gradient Synchronization</a></li>
+  <li><a href="#static-memory" id="toc-static-memory" class="nav-link" data-scroll-target="#static-memory">Static Memory</a></li>
+  <li><a href="#dynamic-memory" id="toc-dynamic-memory" class="nav-link" data-scroll-target="#dynamic-memory">Dynamic Memory</a></li>
   </ul></li>
-  <li><a href="#implementation-approaches" id="toc-implementation-approaches" class="nav-link" data-scroll-target="#implementation-approaches">Implementation Approaches</a></li>
-  <li><a href="#coming-soon" id="toc-coming-soon" class="nav-link" data-scroll-target="#coming-soon">Coming Soon</a></li>
-  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  <li><a href="#batch-size-intuition" id="toc-batch-size-intuition" class="nav-link" data-scroll-target="#batch-size-intuition">Batch Size Intuition</a></li>
+  <li><a href="#memory-usage-in-transformer" id="toc-memory-usage-in-transformer" class="nav-link" data-scroll-target="#memory-usage-in-transformer">Memory usage in Transformer</a>
+  <ul class="collapse">
+  <li><a href="#solution-1-activation-recomputation" id="toc-solution-1-activation-recomputation" class="nav-link" data-scroll-target="#solution-1-activation-recomputation">Solution 1: Activation Recomputation</a></li>
+  </ul></li>
   </ul>
 </nav>
     </div>
@@ -187,62 +252,306 @@ ul.task-list li input[type="checkbox"] {
 
 <section id="introduction" class="level2">
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
-<p>Distributed training has become essential for training large-scale deep learning models. In this post, we’ll explore the fundamentals of distributed training and implement key concepts from scratch.</p>
+<p>Assume that you are preparing for a marathon. If you plot <strong>your performance</strong> versus <strong>amount of training hours you put in</strong>, the relationship is non-linear, performance gains begin to diminish after a certain point (as we will hit the human capacity).</p>
+<p align="center">
+<img src="assets/performance-vs-training-hours.png" alt="Performance vs Training Hours" width="50%">
+</p>
+<p>This concept holds true for LLMs as well. For example, in the LLaMA family (shown below), as the model size increases, the performance improves but the training time increases. The size of the circle represents the size of the model. And here we can see that as the model size increases, the performance improves but the training time increases.</p>
+<p align="center">
+<img src="assets/model-size-vs-performance.png" alt="Model Size vs Performance" width="70%">
+</p>
+<p>But then it requires more training. The number of GPU hours required for training are really huge. If you see the <code>y-axis</code>, it is measured in <code>millions of GPU hours</code>. So how are we supposed to do it in one lifetime if we were to do it on one GPU? It is not feasible.</p>
+<p>So, we need to focus on how we can <strong>efficiently exploit multiple GPUs</strong> using different forms of parallelism. And in this blog, we will look at how to do that and what are the different forms of parallelism available and how we can implement them from scratch using <code>PyTorch</code> and later on we will use <code>Ray</code> to scale the training.</p>
 </section>
-<section id="why-distributed-training" class="level2">
-<h2 class="anchored" data-anchor-id="why-distributed-training">Why Distributed Training?</h2>
-<p>As models grow larger and datasets expand, training on a single GPU becomes impractical. Distributed training allows us to:</p>
-<ul>
-<li><strong>Scale training across multiple GPUs or machines</strong></li>
-<li><strong>Reduce training time significantly</strong></li>
-<li><strong>Handle larger models that don’t fit in single GPU memory</strong></li>
-<li><strong>Process larger batch sizes for better convergence</strong></li>
-</ul>
-</section>
-<section id="core-concepts" class="level2">
-<h2 class="anchored" data-anchor-id="core-concepts">Core Concepts</h2>
-<section id="data-parallelism" class="level3">
-<h3 class="anchored" data-anchor-id="data-parallelism">Data Parallelism</h3>
-<p>The most common approach where each device holds a complete copy of the model and processes different batches of data.</p>
-</section>
-<section id="model-parallelism" class="level3">
-<h3 class="anchored" data-anchor-id="model-parallelism">Model Parallelism</h3>
-<p>Splitting the model itself across multiple devices, necessary when the model is too large for a single device.</p>
-</section>
-<section id="gradient-synchronization" class="level3">
-<h3 class="anchored" data-anchor-id="gradient-synchronization">Gradient Synchronization</h3>
-<p>The key challenge in distributed training is synchronizing gradients across all devices to ensure consistent model updates.</p>
-</section>
-</section>
-<section id="implementation-approaches" class="level2">
-<h2 class="anchored" data-anchor-id="implementation-approaches">Implementation Approaches</h2>
-<p>We’ll explore several approaches to distributed training:</p>
+<section id="deep-learning-training-basics" class="level2">
+<h2 class="anchored" data-anchor-id="deep-learning-training-basics">Deep Learning Training Basics</h2>
+<p>Before diving into scaling, let’s quickly review the standard model training loop, such as a simple <strong>Multi-Layer Perceptron (MLP)</strong>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">### Pseudo Code for the Training Loop</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="dv">1</span>  model <span class="op">=</span> MLP().to(device)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="dv">2</span>  optimizer <span class="op">=</span> Adam(model.parameters())</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="dv">3</span>  criterion <span class="op">=</span> CrossEntropyLoss()</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="dv">4</span>  data_loader <span class="op">=</span> DataLoader(dataset)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="dv">5</span>  </span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="dv">6</span>  <span class="cf">for</span> epoch <span class="kw">in</span> <span class="bu">range</span>(num_epochs):</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="dv">7</span>      model.train()  </span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="dv">8</span>      <span class="cf">for</span> inputs, targets <span class="kw">in</span> data_loader:</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="dv">9</span>          <span class="co"># 1. Move batch to GPU</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="dv">10</span>         inputs, targets <span class="op">=</span> inputs.to(device), targets.to(device)</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="dv">11</span>         </span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="dv">12</span>         <span class="co"># 2. Clear gradients</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="dv">13</span>         optimizer.zero_grad()</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="dv">14</span>         </span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="dv">15</span>         <span class="co"># 3. Forward pass</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="dv">16</span>         outputs <span class="op">=</span> model(inputs)</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="dv">17</span>         loss <span class="op">=</span> criterion(outputs, targets)</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="dv">18</span>         </span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="dv">19</span>         <span class="co"># 4. Backpropagation</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="dv">20</span>         loss.backward()</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="dv">21</span>         </span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="dv">22</span>         <span class="co"># 5. Optimization</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="dv">23</span>         optimizer.step()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>In a typical training loop, after defining the model, the optimizer, the loss function, and the data loader, the training loop trains the model by performing the following steps for each epoch:</p>
 <ol type="1">
-<li><strong>AllReduce</strong> - Efficient gradient aggregation</li>
-<li><strong>Parameter Server</strong> - Centralized coordination</li>
-<li><strong>Ring AllReduce</strong> - Bandwidth-optimal communication</li>
+<li>Iterate over the data in mini-batches (<code>line 6-8</code>).</li>
+<li>Move each batch of data to the GPU (<code>line 9-10</code>).</li>
+<li>Zero out any previous gradients (<code>line 12-13</code>).</li>
+<li>Perform a forward pass to calculate the model outputs and loss (<code>line 15-17</code>).</li>
+<li>Compute gradients through backpropagation (<code>line 18-19</code>).</li>
+<li>Update the model parameters using the optimizer (<code>line 20-21</code>).</li>
 </ol>
+<p align="center">
+<img src="assets/single-gpu.png" alt="Single GPU Training Loop" width="70%">
+</p>
+<p>This pattern is the core of most deep learning training routines.</p>
 </section>
-<section id="coming-soon" class="level2">
-<h2 class="anchored" data-anchor-id="coming-soon">Coming Soon</h2>
-<p>In the following sections, we’ll implement these concepts from scratch using PyTorch and explore:</p>
+<section id="bottlenecks-in-single-gpu-training" class="level2">
+<h2 class="anchored" data-anchor-id="bottlenecks-in-single-gpu-training">Bottlenecks in Single-GPU Training</h2>
+<p>When training deep learning models on a single GPU, high-bandwidth memory (HBM) is utilized by four main types of data:</p>
+<ol type="1">
+<li><p><strong>Model Parameters</strong> (<span class="math inline">\(\Phi\)</span>):<br>
+The weights being learned during training.</p></li>
+<li><p><strong>Parameter Gradients</strong> (<span class="math inline">\(\nabla \Phi\)</span>):<br>
+The gradients computed during backpropagation, required for parameter updates.</p></li>
+<li><p><strong>Optimizer States</strong> (<span class="math inline">\(\Phi_{\text{optim}}\)</span>):<br>
+Auxiliary variables needed by the optimization algorithm, such as momentum and variance estimates (e.g., in Adam).</p></li>
+<li><p><strong>Activations</strong> (<span class="math inline">\(\mathcal{M}_{\text{act}}\)</span>):<br>
+The intermediate outputs from each neural network layer required to compute gradients during the backward pass.</p></li>
+</ol>
+<p>Of these, the first three (<strong>Parameters</strong>, <strong>Gradients</strong>, and <strong>Optimizer States</strong>) are considered <strong>static components</strong>. They collectively define the minimum “static” memory footprint determined by the model architecture itself.</p>
+<p>The fourth component, <strong>Activations</strong>, is <strong>dynamic</strong> and its memory footprint depends on the input size (such as batch size and sequence length). Thus, activations often become the main bottleneck in large-scale training.</p>
+<section id="static-memory" class="level3">
+<h3 class="anchored" data-anchor-id="static-memory">Static Memory</h3>
+<p>And when we are training if you look at the training loop again, until step <code>optimizer.step()</code>, we need to keep everything in the memory. And after <code>optimizer.step()</code>, we can discard the activations and the gradients. And we can keep the model parameters and the optimizer states in the memory.</p>
+<p>If <span class="math inline">\(\Psi\)</span> is the total number of parameters in the model, the total static memory required (<span class="math inline">\(\mathcal{M}_{static}\)</span>) using the Adam optimizer is a fixed amount: <strong><span class="math inline">\(16\Psi\)</span> bytes</strong>.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Component</th>
+<th style="text-align: left;">Precision</th>
+<th style="text-align: left;">Size (<span class="math inline">\(\Psi\)</span> Bytes)</th>
+<th style="text-align: left;">Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Model Parameters</td>
+<td style="text-align: left;">BF32 (4 bytes)</td>
+<td style="text-align: left;"><span class="math inline">\(4\Psi\)</span></td>
+<td style="text-align: left;">Used for forward and backward passes</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Parameter Gradients</td>
+<td style="text-align: left;">BF32 (4 bytes)</td>
+<td style="text-align: left;"><span class="math inline">\(4\Psi\)</span></td>
+<td style="text-align: left;">Used in backpropagation</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Optimizer States (Adam)</td>
+<td style="text-align: left;">FP32 (4+4 bytes)</td>
+<td style="text-align: left;"><span class="math inline">\(8\Psi\)</span></td>
+<td style="text-align: left;">Stores 1st and 2nd moment estimates (<span class="math inline">\(4\Psi\)</span> each)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Total Static Memory</strong></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"><strong><span class="math inline">\(16\Psi\)</span></strong></td>
+<td style="text-align: left;"><strong>The absolute floor for static storage</strong></td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-note callout-titled" title="Why Adam Optimizer Uses $4+4$ Bytes per Parameter">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Why Adam Optimizer Uses <span class="math inline">\(4+4\)</span> Bytes per Parameter
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Adam maintains two additional FP32 (4-byte) tensors per parameter: the <strong>first moment</strong> (mean of gradients, <span class="math inline">\(m\)</span>) and the <strong>second moment</strong> (uncentered variance, <span class="math inline">\(v\)</span>). Thus, for each parameter, Adam stores <span class="math inline">\(4\)</span> bytes for <span class="math inline">\(m\)</span> and <span class="math inline">\(4\)</span> bytes for <span class="math inline">\(v\)</span>, totaling <span class="math inline">\(8\Psi\)</span> bytes.</p>
+</div>
+</div>
+<p>And when it comes to training a model, its all about how smartly we can manage this memory footprint. In modern LLM training, <strong>mixed precision</strong> is employed, typically using BF16 (2 bytes) for fast computation while maintaining a full-precision FP32 (4 bytes) copy of weights and optimizer states for numerical stability.</p>
+<div class="callout callout-style-default callout-tip callout-titled" title="Mixed Precision Training">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Mixed Precision Training
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Mixed Precision Training</strong> accelerates deep learning and reduces memory use by combining 16-bit (BF16/FP16) and 32-bit (FP32) floating-point operations.</p>
 <ul>
-<li>Communication primitives</li>
-<li>Gradient aggregation strategies</li>
-<li>Fault tolerance mechanisms</li>
-<li>Performance optimization techniques</li>
+<li><em>How it works</em>: Forward and backward passes use low-precision (e.g., BF16) for parameters and activations, while a full-precision FP32 <code>master</code> copy of weights and optimizer states is kept for numerical stability.</li>
+<li><em>Why it matters</em>: Enables training of larger models or larger batches within the same hardware footprint. Mixed precision is now standard in large-scale model training.</li>
 </ul>
-<p>Stay tuned for detailed implementations and benchmarks!</p>
+</div>
+</div>
+<p>So, with mixed precision, the breakdown is as follows:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Component</th>
+<th style="text-align: left;">Precision</th>
+<th style="text-align: left;">Size (<span class="math inline">\(\Psi\)</span> Bytes)</th>
+<th style="text-align: left;">Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Model Parameters</td>
+<td style="text-align: left;">BF16 (2 bytes)</td>
+<td style="text-align: left;"><span class="math inline">\(2\Psi\)</span></td>
+<td style="text-align: left;">Used for forward and backward passes</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Parameter Gradients</td>
+<td style="text-align: left;">BF16 (2 bytes)</td>
+<td style="text-align: left;"><span class="math inline">\(2\Psi\)</span></td>
+<td style="text-align: left;">Used in backpropagation</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Master Weights</td>
+<td style="text-align: left;">FP32 (4 bytes)</td>
+<td style="text-align: left;"><span class="math inline">\(4\Psi\)</span></td>
+<td style="text-align: left;">Full precision copy for the update step</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Optimizer States (Adam)</td>
+<td style="text-align: left;">FP32 (4+4 bytes)</td>
+<td style="text-align: left;"><span class="math inline">\(8\Psi\)</span></td>
+<td style="text-align: left;">Stores 1st and 2nd moment estimates (<span class="math inline">\(4\Psi\)</span> each)</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Total Static Memory (with Mixed Precision)</strong></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"><strong><span class="math inline">\(16\Psi\)</span></strong></td>
+<td style="text-align: left;"><strong>The absolute floor for static storage</strong></td>
+</tr>
+</tbody>
+</table>
+<p>You might notice that the total static memory remains <strong><span class="math inline">\(16\Psi\)</span></strong> bytes. So what is the advantage of mixed precision training?</p>
+<p>The key benefits of mixed precision are:</p>
+<ul>
+<li><strong>Increased Training Speed:</strong> As we are using lower-precision data types (like BF16) during forward and backward passes, computation is faster and less memory bandwidth is used.</li>
+<li><strong>Reduced Activation Memory:</strong> Since our model parameters and optimizer states are stored in FP32, the activations, which are stored in BF16 during training, require half the memory compared to FP32, so the dynamic (activation) memory footprint is significantly lower.</li>
+</ul>
+<p>While the absolute static memory is unchanged, mixed precision allows for faster training and greater memory efficiency, especially for storing activations, enabling larger models or batches to fit within the same hardware limits.</p>
+<p>And this calculation reveals a significant challenge: a <strong>70 Billion parameter model</strong> requires approximately <span class="math inline">\(70\text{B} \times 16 \text{ bytes} \approx 1120 \text{ GB}\)</span> of static memory. With high-end GPUs typically offering only <span class="math inline">\(80 \text{ GB}\)</span> of memory, loading even the static state of the model becomes impossible, without considering the dynamic activations.</p>
 </section>
-<section id="references" class="level2">
-<h2 class="anchored" data-anchor-id="references">References</h2>
+<section id="dynamic-memory" class="level3">
+<h3 class="anchored" data-anchor-id="dynamic-memory">Dynamic Memory</h3>
+<p>This component is dependent on the input batch and is the primary cause of memory bottlenecks.</p>
 <ul>
-<li><a href="https://pytorch.org/docs/stable/distributed.html">PyTorch Distributed</a></li>
-<li><a href="https://github.com/horovod/horovod">Horovod</a></li>
-<li><a href="https://www.deepspeed.ai/">DeepSpeed</a></li>
+<li><p><strong>Activations:</strong> The output of each layer. They must be stored until the <strong>backward pass</strong> to compute the gradients.</p>
+<ul>
+<li>For a linear layer <span class="math inline">\(y=Wx\)</span>, the gradient for <span class="math inline">\(W\)</span> is calculated as: <span class="math display">\[\frac{\partial L}{\partial W} = \frac{\partial L}{\partial y} \cdot x^T\]</span></li>
+<li>This requires saving the layer’s input, <span class="math inline">\(x\)</span> (the activation from the previous layer).</li>
+</ul></li>
+<li><p><strong>Activation Memory Equation:</strong> The total memory required for activations (<span class="math inline">\(m_{act}\)</span>) in mixed precision can be estimated by the following equation: <span class="math display">\[\mathcal{M}_{\text{act}} = L \cdot \text{seq} \cdot \text{bs} \cdot h \cdot \left(34 + \frac{5 \cdot n_{heads} \cdot \text{seq}}{\text{h}}\right)\]</span></p>
+<p>Where:</p>
+<ul>
+<li><span class="math inline">\(L\)</span>: Number of layers</li>
+<li><span class="math inline">\(\text{seq}\)</span>: Sequence length</li>
+<li><span class="math inline">\(\text{bs}\)</span>: Batch size (number of samples)</li>
+<li><span class="math inline">\(h\)</span>: Hidden dimension of the model</li>
+<li><span class="math inline">\(n_{heads}\)</span>: Number of attention heads</li>
+</ul></li>
 </ul>
+<p align="center">
+<img src="assets/activations.png" alt="Activation Count" width="70%">
+</p>
+<p>As we can see, activation memory usage is <strong>not static</strong> for a given model; it scales:</p>
+<ul>
+<li><strong>Linearly</strong> with the <strong>batch size</strong> (<span class="math inline">\(\text{bs}\)</span>)</li>
+<li><strong>Quadratically</strong> with the <strong>sequence length</strong> (<span class="math inline">\(\text{seq}\)</span>)</li>
+</ul>
+<p>And this quadratic scaling with <span class="math inline">\(\text{seq}^2\)</span> (an effect stemming from the attention matrix) means the activation memory is the part that will <strong>blow up</strong> when you increase the batch size or train with longer sequences.</p>
+</section>
+</section>
+<section id="batch-size-intuition" class="level2">
+<h2 class="anchored" data-anchor-id="batch-size-intuition">Batch Size Intuition</h2>
+<p>So, as we can see that the longer the sequence, the more activations we need and hence the more memory we need. So, even for one single sequence, the memory required is more than 50 GB. And this is a significant challenge for training large models.</p>
+<div class="callout callout-style-default callout-note callout-titled" title="Global Batch Size">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Global Batch Size
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>When we talk about batch size in LLM pre-training, we usually refer to it in terms of the <strong>number of tokens</strong>, not the number of sequences. That is, the token batch size is calculated as <strong>sequence length × number of sequences (micro-batch size)</strong></p>
+</div>
+</div>
+<p>Typically, the global batch size used in pre-training is extremely large—usually in the <strong>millions of tokens</strong>. And in practice, we start the training with a smaller batch size and gradually increase it over the course of training.</p>
+<ul>
+<li><strong>Small Batch Size:</strong> Used at the <strong>beginning of training</strong> when the loss is high. It provides <strong>quick, noisy signals</strong> that help the model traverse the loss landscape rapidly toward the minima.</li>
+<li><strong>Large Batch Size:</strong> Used as training approaches the optima. It provides a <strong>more accurate gradient direction</strong> (a clearer signal), which reduces noise and ensures confident, stable convergence.</li>
+</ul>
+<p align="center">
+<img src="assets/batch-size.png" alt="Batch Size Intuition" width="100%">
+</p>
+</section>
+<section id="memory-usage-in-transformer" class="level2">
+<h2 class="anchored" data-anchor-id="memory-usage-in-transformer">Memory usage in Transformer</h2>
+<p>To get a sense of the memory usage in a Transformer, let’s take a look at the memory usage of <code>Llama 3.1</code> {<code>8B</code>, <code>70B</code> and <code>13B</code>} models.</p>
+<p align="center">
+<img src="assets/llama-3-1.png" alt="Batch Size Intuition" width="100%">
+</p>
+<p>From this graph, we can clearly see that forshort sequences (or small batch sizes), memory usage for activations is almost negligible, but from around 4K-16K tokens they start to take up a significant amount of memory (this is because of the quadratic scaling with the sequence length, which we discussed earlier), while usage for parameters, gradients, and optimizer states is roughly independent of the sequence length and batch size.</p>
+<p>How can we solve this problem of <code>activation explosion</code>? Can we somehow avoide storing all those activations ?</p>
+<section id="solution-1-activation-recomputation" class="level3">
+<h3 class="anchored" data-anchor-id="solution-1-activation-recomputation">Solution 1: Activation Recomputation</h3>
+<p>Recall why we need to store all those activations in the first place ? It is because we need to compute the gradients for the model parameters. So, if we can somehow avoid storing all those activations, we can save a lot of memory.</p>
+<p>One effective approach is <strong>Gradient Checkpointing</strong> also known as <strong>Activation Recomputation</strong>. With this technique, we discard most of the activations during the forward pass to save memory and recompute them on the fly during the backward pass when gradients are needed.</p>
+<p>Normally, we’d store every hidden state between learnable operations (like feedforward layers, layer norm, etc.) to use them during the backward pass. With activation recomputation, we only store activations at specific checkpoints and recalculate everything else during backpropagation. This helps us manage memory while training large models. The process typically looks like this:</p>
+<p align="center">
+<img src="assets/gradient-accumulation-1.png" alt="Gradient Accumulation" width="70%">
+</p>
+<p>But as we know in life, there is no free lunch. Although we save memory by discarding most of the activations during the forward pass, we spend some extra compute to recompute these activations on the fly during the backward pass.</p>
+<p>There are a few ways to do activation checkpointing, and each involves different memory and compute tradeoffs.</p>
+<p>The most aggressive approach is called <strong>Full Activation Checkpointing</strong>, where you only store activations at the end of each layer (instead of storing every intermediate activation). This method is great for memory since you’re keeping so little, but it’s the most compute-heavy, often increasing computation time by 30–40% because you have to recompute almost everything during backpropagation.</p>
+<p>But do we really need to treat every part of the model the same? By profiling, we find that the main memory culprit is the activations from the <strong>Multi-Headed Attention (MHA)</strong> layers, since they scale quadratically with sequence length.</p>
+<p>This leads to a more balanced strategy: <strong>Selective Checkpointing</strong>. Here, we only skip storing activations for the heavy MHA layers and still store them for the lighter MLP layers. The payoff is impressive: up to 70% memory savings for only about 2.7% extra computation.</p>
+<div class="callout callout-style-default callout-note callout-titled" title="Activation Checkpointing on Llama 3.1 8B model">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Activation Checkpointing on Llama 3.1 8B model
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>As you can see the graph bellow, on an 8-billion parameter model with a batch size of 1 and sequence length 4096, activation memory without any checkpointing can hit 97 GB, which is enough to break most GPUs. With selective activation checkpointing, that drops to 17 GB. And with full checkpointing, at the extreme, memory usage can go down to just 1 GB!</p>
+</div>
+</div>
+<p align="center">
+<img src="assets/llama-checkp.png" alt="Gradient Accumulation" width="100%">
+</p>
+<p>Now that we’ve learned about recomputation, we can tame the activation memory usage we saw in the previous graphs!</p>
+<p>However, activations still have a linear dependence on the batch size, so as we move to larger batch sizes this might become an issue again. Fortunately, we have a second tool in our box - <strong>gradient accumulation</strong> to the rescue!</p>
 
 
+</section>
 </section>
 
 </main> <!-- /main -->

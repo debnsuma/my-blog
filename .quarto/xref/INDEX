@@ -13,5 +13,20 @@
   },
   "about.qmd": {
     "about.html": "559c3587"
+  },
+  "posts/distributed-training-from-scratch/index copy.qmd": {
+    "index copy.html": "25bafc90"
+  },
+  "posts/distributed-training-from-scratch/assets/l1.md": {
+    "l1.html": "134129b8"
+  },
+  "posts/distributed-training-from-scratch/assets/l2.md": {
+    "l2.html": "38f739b0"
+  },
+  "posts/distributed-training-from-scratch/index copy 2.qmd": {
+    "index copy 2.html": "2d01bd28"
+  },
+  "posts/distributed-training-from-scratch/index2.qmd": {
+    "index2.html": "a076588d"
   }
 }
