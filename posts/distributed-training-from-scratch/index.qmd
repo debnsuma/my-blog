@@ -30,9 +30,10 @@ So, we need to focus on how we can **efficiently exploit multiple GPUs** using d
 
 Before diving into scaling, let's quickly review the standard model training loop, such as a simple **Multi-Layer Perceptron (MLP)**:
 
-```python
-### Pseudo Code for the Training Loop
+::: {.panel-tabset}
+## Pseudo Code for the Training Loop
 
+```python
 1  model = MLP().to(device)
 2  optimizer = Adam(model.parameters())
 3  criterion = CrossEntropyLoss()
@@ -57,6 +58,8 @@ Before diving into scaling, let's quickly review the standard model training loo
 22         # 5. Optimization
 23         optimizer.step()
 ```
+:::
+
 
 In a typical training loop, after defining the model, the optimizer, the loss function, and the data loader, the training loop trains the model by performing the following steps for each epoch: 
 
@@ -233,3 +236,113 @@ As you can see the graph bellow, on an 8-billion parameter model with a batch si
 Now that we’ve learned about recomputation, we can tame the activation memory usage we saw in the previous graphs!
 
 However, activations still have a linear dependence on the batch size, so as we move to larger batch sizes this might become an issue again. Fortunately, we have a second tool in our box - **gradient accumulation** to the rescue!
+
+
+### Solution 2: Gradient Accumulation
+
+Another effective approach is **Gradient Accumulation** which is a technique that allows us to accumulate gradients over multiple micro-batches before performing a single global optimization step. This is particularly useful when we have a large batch size and we want to avoid running out of memory.
+
+The general idea is to split the batch into smaller micro-batches and process them one by one. We compute the gradients for each micro-batch and accumulate them (we **do not do** `optimizer.step()` after each micro-batch). And after processing all the micro-batches, **we perform a single** global optimization step.
+
+Let's take an example of a simple linear regression model:
+
+Let's use a different analogy: predicting the **score of a student on a test** based on two factors—the number of hours studied ($x_1$) and the number of hours slept the night before ($x_2$). We assume a simple linear relationship between these inputs and the output score:
+
+$$
+\text{score}_{pred} = x_1 w_1 + x_2 w_2 + b
+$$
+
+Our aim is to use stochastic gradient descent to determine the best values for $w_1$, $w_2$, and $b$ such that the mean squared error (MSE) between the actual score ($\text{score}_{target}$) and the predicted score ($\text{score}_{pred}$) is minimized:
+
+$$
+\underset{w_1, w_2, b}{\mathrm{argmin}} \; (\text{score}_{pred} - \text{score}_{target})^2
+$$
+
+Without gradient accumulation, we would update the parameters after each batch of student's data. See the code bellow:
+
+::: {.panel-tabset}
+
+## Without Gradient Accumulation
+
+```python
+1  def train_no_accumulate(params: ModelParameters, 
+2                         num_epochs: int = 10, 
+3                         learning_rate: float = 1e-3):
+4      for epoch in range(1, num_epochs + 1):
+5          for (x1, x2), y_target in training_data:
+6  
+7              # Calculate the output of the model
+8              z1 = x1 * params.w1
+9              z2 = x2 * params.w2
+10             y_pred = z1 + z2 + params.b
+11             loss = (y_pred - y_target) ** 2
+12 
+13             # Calculate the gradients of the loss w.r.t. the parameters
+14             loss.backward()
+15 
+16             # Update the parameters (at each iteration)
+17             with torch.no_grad():
+18                 # Equivalent to calling optimizer.step()
+19                 params.w1 -= learning_rate * params.w1.grad
+20                 params.w2 -= learning_rate * params.w2.grad
+21                 params.b  -= learning_rate * params.b.grad
+22 
+23                 # Reset the gradients to zero
+24                 # Equivalent to calling optimizer.zero_grad()
+25                 params.w1.grad.zero_()
+26                 params.w2.grad.zero_()
+27                 params.b.grad.zero_()
+```
+
+:::
+
+With **gradient accumulation**, instead of updating the parameters after each batch of data, we accumulate gradients across several micro-batches (let's say 3) and then update all at once. This allows us to train with larger effective batch sizes even if memory is limited. See the code bellow, where we use a `micro_batch_size = 3`:
+
+::: {.panel-tabset}
+
+## With Gradient Accumulation
+```python
+1  def train_accumulate(params: ModelParameters, 
+2                       num_epochs: int = 10, 
+3                       learning_rate: float = 1e-3, 
+4                       micro_batch_size: int = 3):
+5  
+6      for epoch in range(1, num_epochs + 1):
+7          for index, ((x1, x2), y_target) in enumerate(training_data):
+8  
+9              # Calculate the output of the model
+10             z1 = x1 * params.w1
+11             z2 = x2 * params.w2
+12             y_pred = z1 + z2 + params.b
+13             loss = (y_pred - y_target) ** 2
+14 
+15             # Accumulate gradients
+16             loss.backward()
+17 
+18             # If we have processed 3 micro-batches OR reached the end of the dataset
+19             if (index + 1) % micro_batch_size == 0 or index == len(training_data) - 1:
+20                 with torch.no_grad():
+21                     # Equivalent to optimizer.step()
+22                     params.w1 -= learning_rate * params.w1.grad
+23                     params.w2 -= learning_rate * params.w2.grad
+24                     params.b  -= learning_rate * params.b.grad
+25 
+26                     # Reset the gradients = optimizer.zero_grad()
+27                     params.w1.grad.zero_()
+28                     params.w2.grad.zero_()
+29                     params.b.grad.zero_()
+```
+
+:::
+
+<p align="center">
+  <img src="assets/grad-acc.png" alt="Gradient Accumulation" width="100%"/>
+
+Gradient accumulation allows us to reduce activation memory, which grows linearly with batch size, by processing smaller micro-batches sequentially. This reduces stored activations and gradients since only one micro-batch's worth of activations needs to be kept in memory at a time, which helps reduce the overall activation memory footprint.
+
+Again there is no free lunch. As gradient accumulation requires multiple consecutive forward/backward passes per optimization step, it increases the compute overhead and slows down training.
+
+So far, we've seen how techniques like `gradient checkpointing` and `gradient accumulation` help deal with the memory blowup issue caused by activations—the dynamic part of memory usage. Both allow us to fit larger models or batches on a single GPU, but mostly by working sequentially and slowing down training. However, these don't address the static memory required for parameters, gradients, and optimizer states, nor do they fully utilize available hardware. 
+
+To tackle this, we can scale training across multiple GPUs using **Data Parallelism**. By splitting micro-batches and processing them simultaneously on several GPUs, we address both memory and compute bottlenecks, and that is what we will discuss in the next section.
+

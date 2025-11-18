@@ -1,1 +1,1 @@
-{"entries":[],"headings":["introduction","deep-learning-training-basics","bottlenecks-in-single-gpu-training","static-memory","dynamic-memory","batch-size-intuition","memory-usage-in-transformer","solution-1-activation-recomputation"]}
+{"entries":[],"headings":["introduction","deep-learning-training-basics","bottlenecks-in-single-gpu-training","static-memory","dynamic-memory","batch-size-intuition","memory-usage-in-transformer","solution-1-activation-recomputation","solution-2-gradient-accumulation"]}

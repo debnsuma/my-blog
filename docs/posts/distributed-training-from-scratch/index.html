@@ -239,6 +239,7 @@ window.Quarto = {
   <li><a href="#memory-usage-in-transformer" id="toc-memory-usage-in-transformer" class="nav-link" data-scroll-target="#memory-usage-in-transformer">Memory usage in Transformer</a>
   <ul class="collapse">
   <li><a href="#solution-1-activation-recomputation" id="toc-solution-1-activation-recomputation" class="nav-link" data-scroll-target="#solution-1-activation-recomputation">Solution 1: Activation Recomputation</a></li>
+  <li><a href="#solution-2-gradient-accumulation" id="toc-solution-2-gradient-accumulation" class="nav-link" data-scroll-target="#solution-2-gradient-accumulation">Solution 2: Gradient Accumulation</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -266,31 +267,36 @@ window.Quarto = {
 <section id="deep-learning-training-basics" class="level2">
 <h2 class="anchored" data-anchor-id="deep-learning-training-basics">Deep Learning Training Basics</h2>
 <p>Before diving into scaling, let’s quickly review the standard model training loop, such as a simple <strong>Multi-Layer Perceptron (MLP)</strong>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">### Pseudo Code for the Training Loop</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="dv">1</span>  model <span class="op">=</span> MLP().to(device)</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="dv">2</span>  optimizer <span class="op">=</span> Adam(model.parameters())</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="dv">3</span>  criterion <span class="op">=</span> CrossEntropyLoss()</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="dv">4</span>  data_loader <span class="op">=</span> DataLoader(dataset)</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="dv">5</span>  </span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="dv">6</span>  <span class="cf">for</span> epoch <span class="kw">in</span> <span class="bu">range</span>(num_epochs):</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="dv">7</span>      model.train()  </span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="dv">8</span>      <span class="cf">for</span> inputs, targets <span class="kw">in</span> data_loader:</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="dv">9</span>          <span class="co"># 1. Move batch to GPU</span></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="dv">10</span>         inputs, targets <span class="op">=</span> inputs.to(device), targets.to(device)</span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="dv">11</span>         </span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="dv">12</span>         <span class="co"># 2. Clear gradients</span></span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="dv">13</span>         optimizer.zero_grad()</span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="dv">14</span>         </span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="dv">15</span>         <span class="co"># 3. Forward pass</span></span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="dv">16</span>         outputs <span class="op">=</span> model(inputs)</span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="dv">17</span>         loss <span class="op">=</span> criterion(outputs, targets)</span>
-<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="dv">18</span>         </span>
-<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="dv">19</span>         <span class="co"># 4. Backpropagation</span></span>
-<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="dv">20</span>         loss.backward()</span>
-<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="dv">21</span>         </span>
-<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="dv">22</span>         <span class="co"># 5. Optimization</span></span>
-<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="dv">23</span>         optimizer.step()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true" href="">Pseudo Code for the Training Loop</a></li></ul>
+<div class="tab-content">
+<div id="tabset-1-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-1-1-tab">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="dv">1</span>  model <span class="op">=</span> MLP().to(device)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="dv">2</span>  optimizer <span class="op">=</span> Adam(model.parameters())</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="dv">3</span>  criterion <span class="op">=</span> CrossEntropyLoss()</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="dv">4</span>  data_loader <span class="op">=</span> DataLoader(dataset)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="dv">5</span>  </span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="dv">6</span>  <span class="cf">for</span> epoch <span class="kw">in</span> <span class="bu">range</span>(num_epochs):</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="dv">7</span>      model.train()  </span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="dv">8</span>      <span class="cf">for</span> inputs, targets <span class="kw">in</span> data_loader:</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="dv">9</span>          <span class="co"># 1. Move batch to GPU</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="dv">10</span>         inputs, targets <span class="op">=</span> inputs.to(device), targets.to(device)</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="dv">11</span>         </span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="dv">12</span>         <span class="co"># 2. Clear gradients</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="dv">13</span>         optimizer.zero_grad()</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="dv">14</span>         </span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="dv">15</span>         <span class="co"># 3. Forward pass</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="dv">16</span>         outputs <span class="op">=</span> model(inputs)</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="dv">17</span>         loss <span class="op">=</span> criterion(outputs, targets)</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="dv">18</span>         </span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="dv">19</span>         <span class="co"># 4. Backpropagation</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="dv">20</span>         loss.backward()</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="dv">21</span>         </span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="dv">22</span>         <span class="co"># 5. Optimization</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="dv">23</span>         optimizer.step()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</div>
+</div>
 <p>In a typical training loop, after defining the model, the optimizer, the loss function, and the data loader, the training loop trains the model by performing the following steps for each epoch:</p>
 <ol type="1">
 <li>Iterate over the data in mini-batches (<code>line 6-8</code>).</li>
@@ -549,6 +555,98 @@ The intermediate outputs from each neural network layer required to compute grad
 </p>
 <p>Now that we’ve learned about recomputation, we can tame the activation memory usage we saw in the previous graphs!</p>
 <p>However, activations still have a linear dependence on the batch size, so as we move to larger batch sizes this might become an issue again. Fortunately, we have a second tool in our box - <strong>gradient accumulation</strong> to the rescue!</p>
+</section>
+<section id="solution-2-gradient-accumulation" class="level3">
+<h3 class="anchored" data-anchor-id="solution-2-gradient-accumulation">Solution 2: Gradient Accumulation</h3>
+<p>Another effective approach is <strong>Gradient Accumulation</strong> which is a technique that allows us to accumulate gradients over multiple micro-batches before performing a single global optimization step. This is particularly useful when we have a large batch size and we want to avoid running out of memory.</p>
+<p>The general idea is to split the batch into smaller micro-batches and process them one by one. We compute the gradients for each micro-batch and accumulate them (we <strong>do not do</strong> <code>optimizer.step()</code> after each micro-batch). And after processing all the micro-batches, <strong>we perform a single</strong> global optimization step.</p>
+<p>Let’s take an example of a simple linear regression model:</p>
+<p>Let’s use a different analogy: predicting the <strong>score of a student on a test</strong> based on two factors—the number of hours studied (<span class="math inline">\(x_1\)</span>) and the number of hours slept the night before (<span class="math inline">\(x_2\)</span>). We assume a simple linear relationship between these inputs and the output score:</p>
+<p><span class="math display">\[
+\text{score}_{pred} = x_1 w_1 + x_2 w_2 + b
+\]</span></p>
+<p>Our aim is to use stochastic gradient descent to determine the best values for <span class="math inline">\(w_1\)</span>, <span class="math inline">\(w_2\)</span>, and <span class="math inline">\(b\)</span> such that the mean squared error (MSE) between the actual score (<span class="math inline">\(\text{score}_{target}\)</span>) and the predicted score (<span class="math inline">\(\text{score}_{pred}\)</span>) is minimized:</p>
+<p><span class="math display">\[
+\underset{w_1, w_2, b}{\mathrm{argmin}} \; (\text{score}_{pred} - \text{score}_{target})^2
+\]</span></p>
+<p>Without gradient accumulation, we would update the parameters after each batch of student’s data. See the code bellow:</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" role="tab" aria-controls="tabset-2-1" aria-selected="true" href="">Without Gradient Accumulation</a></li></ul>
+<div class="tab-content">
+<div id="tabset-2-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-2-1-tab">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="dv">1</span>  <span class="kw">def</span> train_no_accumulate(params: ModelParameters, </span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="dv">2</span>                         num_epochs: <span class="bu">int</span> <span class="op">=</span> <span class="dv">10</span>, </span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="dv">3</span>                         learning_rate: <span class="bu">float</span> <span class="op">=</span> <span class="fl">1e-3</span>):</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="dv">4</span>      <span class="cf">for</span> epoch <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, num_epochs <span class="op">+</span> <span class="dv">1</span>):</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="dv">5</span>          <span class="cf">for</span> (x1, x2), y_target <span class="kw">in</span> training_data:</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="dv">6</span>  </span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="dv">7</span>              <span class="co"># Calculate the output of the model</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="dv">8</span>              z1 <span class="op">=</span> x1 <span class="op">*</span> params.w1</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="dv">9</span>              z2 <span class="op">=</span> x2 <span class="op">*</span> params.w2</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="dv">10</span>             y_pred <span class="op">=</span> z1 <span class="op">+</span> z2 <span class="op">+</span> params.b</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="dv">11</span>             loss <span class="op">=</span> (y_pred <span class="op">-</span> y_target) <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="dv">12</span> </span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="dv">13</span>             <span class="co"># Calculate the gradients of the loss w.r.t. the parameters</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="dv">14</span>             loss.backward()</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="dv">15</span> </span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="dv">16</span>             <span class="co"># Update the parameters (at each iteration)</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="dv">17</span>             <span class="cf">with</span> torch.no_grad():</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="dv">18</span>                 <span class="co"># Equivalent to calling optimizer.step()</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="dv">19</span>                 params.w1 <span class="op">-=</span> learning_rate <span class="op">*</span> params.w1.grad</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="dv">20</span>                 params.w2 <span class="op">-=</span> learning_rate <span class="op">*</span> params.w2.grad</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="dv">21</span>                 params.b  <span class="op">-=</span> learning_rate <span class="op">*</span> params.b.grad</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="dv">22</span> </span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="dv">23</span>                 <span class="co"># Reset the gradients to zero</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="dv">24</span>                 <span class="co"># Equivalent to calling optimizer.zero_grad()</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a><span class="dv">25</span>                 params.w1.grad.zero_()</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="dv">26</span>                 params.w2.grad.zero_()</span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a><span class="dv">27</span>                 params.b.grad.zero_()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</div>
+</div>
+<p>With <strong>gradient accumulation</strong>, instead of updating the parameters after each batch of data, we accumulate gradients across several micro-batches (let’s say 3) and then update all at once. This allows us to train with larger effective batch sizes even if memory is limited. See the code bellow, where we use a <code>micro_batch_size = 3</code>:</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-3-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-1" role="tab" aria-controls="tabset-3-1" aria-selected="true" href="">With Gradient Accumulation</a></li></ul>
+<div class="tab-content">
+<div id="tabset-3-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-3-1-tab">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="dv">1</span>  <span class="kw">def</span> train_accumulate(params: ModelParameters, </span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="dv">2</span>                       num_epochs: <span class="bu">int</span> <span class="op">=</span> <span class="dv">10</span>, </span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="dv">3</span>                       learning_rate: <span class="bu">float</span> <span class="op">=</span> <span class="fl">1e-3</span>, </span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="dv">4</span>                       micro_batch_size: <span class="bu">int</span> <span class="op">=</span> <span class="dv">3</span>):</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="dv">5</span>  </span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="dv">6</span>      <span class="cf">for</span> epoch <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, num_epochs <span class="op">+</span> <span class="dv">1</span>):</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="dv">7</span>          <span class="cf">for</span> index, ((x1, x2), y_target) <span class="kw">in</span> <span class="bu">enumerate</span>(training_data):</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="dv">8</span>  </span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="dv">9</span>              <span class="co"># Calculate the output of the model</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="dv">10</span>             z1 <span class="op">=</span> x1 <span class="op">*</span> params.w1</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="dv">11</span>             z2 <span class="op">=</span> x2 <span class="op">*</span> params.w2</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="dv">12</span>             y_pred <span class="op">=</span> z1 <span class="op">+</span> z2 <span class="op">+</span> params.b</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="dv">13</span>             loss <span class="op">=</span> (y_pred <span class="op">-</span> y_target) <span class="op">**</span> <span class="dv">2</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="dv">14</span> </span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="dv">15</span>             <span class="co"># Accumulate gradients</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a><span class="dv">16</span>             loss.backward()</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a><span class="dv">17</span> </span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a><span class="dv">18</span>             <span class="co"># If we have processed 3 micro-batches OR reached the end of the dataset</span></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a><span class="dv">19</span>             <span class="cf">if</span> (index <span class="op">+</span> <span class="dv">1</span>) <span class="op">%</span> micro_batch_size <span class="op">==</span> <span class="dv">0</span> <span class="kw">or</span> index <span class="op">==</span> <span class="bu">len</span>(training_data) <span class="op">-</span> <span class="dv">1</span>:</span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a><span class="dv">20</span>                 <span class="cf">with</span> torch.no_grad():</span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a><span class="dv">21</span>                     <span class="co"># Equivalent to optimizer.step()</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a><span class="dv">22</span>                     params.w1 <span class="op">-=</span> learning_rate <span class="op">*</span> params.w1.grad</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a><span class="dv">23</span>                     params.w2 <span class="op">-=</span> learning_rate <span class="op">*</span> params.w2.grad</span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a><span class="dv">24</span>                     params.b  <span class="op">-=</span> learning_rate <span class="op">*</span> params.b.grad</span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a><span class="dv">25</span> </span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a><span class="dv">26</span>                     <span class="co"># Reset the gradients = optimizer.zero_grad()</span></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a><span class="dv">27</span>                     params.w1.grad.zero_()</span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a><span class="dv">28</span>                     params.w2.grad.zero_()</span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a><span class="dv">29</span>                     params.b.grad.zero_()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</div>
+</div>
+<p align="center">
+</p><p><img src="assets/grad-acc.png" alt="Gradient Accumulation" width="100%"></p>
+<p>Gradient accumulation allows us to reduce activation memory, which grows linearly with batch size, by processing smaller micro-batches sequentially. This reduces stored activations and gradients since only one micro-batch’s worth of activations needs to be kept in memory at a time, which helps reduce the overall activation memory footprint.</p>
+<p>Again there is no free lunch. As gradient accumulation requires multiple consecutive forward/backward passes per optimization step, it increases the compute overhead and slows down training.</p>
+<p>So far, we’ve seen how techniques like <code>gradient checkpointing</code> and <code>gradient accumulation</code> help deal with the memory blowup issue caused by activations—the dynamic part of memory usage. Both allow us to fit larger models or batches on a single GPU, but mostly by working sequentially and slowing down training. However, these don’t address the static memory required for parameters, gradients, and optimizer states, nor do they fully utilize available hardware.</p>
+<p>To tackle this, we can scale training across multiple GPUs using <strong>Data Parallelism</strong>. By splitting micro-batches and processing them simultaneously on several GPUs, we address both memory and compute bottlenecks, and that is what we will discuss in the next section.</p>
 
 
 </section>
