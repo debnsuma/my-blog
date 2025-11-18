@@ -2,7 +2,7 @@
 title: "My Blog"
 listing:
   - id: posts
-    contents: posts/*/index.qmd
+    contents: posts/distributed-training-from-scratch/index.qmd
     type: default
     sort: "date desc"
 ---
