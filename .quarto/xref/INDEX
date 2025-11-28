@@ -28,5 +28,8 @@
   },
   "posts/distributed-training-from-scratch/index2.qmd": {
     "index2.html": "a076588d"
+  },
+  "posts/distributed-training-from-scratch/temp.md": {
+    "temp.html": "89f8bbc2"
   }
 }

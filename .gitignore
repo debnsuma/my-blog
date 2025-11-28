@@ -1,2 +1,5 @@
 /.quarto/
 **/*.quarto_ipynb
+
+posts/distributed-training-from-scratch/assets/_ref/
+posts/distributed-training-from-scratch/assets/_ref/** */
