@@ -8,23 +8,56 @@ toc: true
 description: "A comprehensive guide to understanding and implementing distributed training for deep learning models from first principles"
 ---
 
+
 ## Introduction
 
-Assume that you are preparing for a marathon. If you plot **your performance** versus **amount of training hours you put in**, the relationship is non-linear, performance gains begin to diminish after a certain point (as we will hit the human capacity).
+Deep learning models are becoming massive, and so are the challenges of training them. I am quite new to distributed training, and at present I am trying to learn how to scale the training to multiple GPUs and multiple machines using different forms of parallelism. 
+
+And in the process, I found that more than the training or the algorithm itself, it is about understanding how distributed systems work and how to manage resources (GPUs and CPUs) efficiently.
 
 <p align="center">
-  <img src="assets/performance-vs-training-hours.png" alt="Performance vs Training Hours" width="50%"/>
+  <img src="assets/model_params.png" alt="Model Parameters vs Training Time" width="100%"/>
 </p>
 
-This concept holds true for LLMs as well. For example, in the LLaMA family (shown below), as the model size increases, the performance improves but the training time increases. The size of the circle represents the size of the model. And here we can see that as the model size increases, the performance improves but the training time increases. 
+As models grow in size and complexity, the time required to train them is skyrocketing, sometimes taking days, weeks, or even months for a single epoch on one GPU. 
+
+
+| Model            | Parameters<br/>(Millions) | Training Time on A100<br/>(GPU Hours) |
+|------------------|:------------------------:|:-----------------------------:|
+| **ResNet-50**    | 26                       | 31                            |
+| **ResNet-101**   | 45                       | 44                            |
+| **BERT-Base**    | 108                      | 84                            |
+| **Turing-NLG 17B** | 17,000                 | TBA                           |
+| **GPT-3 175B**   | 175,000                  | 3,100,000                     |
+
+
+If we look at this table, we can see the dramatic growth in model parameter counts and the corresponding jump in training time requirements:
+
+- **ResNet-50 and ResNet-101** are manageable on a single GPU, but BERT-Base is already pushing the envelope.
+- **Turing-NLG 17B** and especially **GPT-3 175B** are in a completely different league, requiring immense computing power and time.
+
+::: {.callout-note}
+If we tried to train GPT-3 on a single GPU, it would take roughly **355 years** to finish. Distributed training is not just useful, it's absolutely essential as model sizes and training time requirements soar
+:::
+
+But why is this happening? Let's set the stage with some striking observations:
+
+- Model sizes and GPU demand are exploding.
+- Training hours required can reach into the millions for cutting-edge models.
+
+Consider the `LLaMA` family of models. The graph below shows that as you scale up model size (circle diameter), performance increases but so does the training time. Look at the y-axis: we're talking *millions* of GPU hours! Training even one of these models on a single GPU isn't just slow, it's practically impossible.
 
 <p align="center">
   <img src="assets/model-size-vs-performance.png" alt="Model Size vs Performance" width="70%"/>
 </p>
 
-But then it requires more training. The number of GPU hours required for training are really huge. If you see the `y-axis`, it is measured in `millions of GPU hours`. So how are we supposed to do it in one lifetime if we were to do it on one GPU? It is not feasible. 
+In this blog post, we'll try to understand distributed training from first principles and how to scale the training to multiple GPUs and multiple machines using different forms of parallelism. We will also look at how to implement these techniques from scratch using `PyTorch` and later on we will use `Ray` to scale the training.
 
-So, we need to focus on how we can **efficiently exploit multiple GPUs** using different forms of parallelism. And in this blog, we will look at how to do that and what are the different forms of parallelism available and how we can implement them from scratch using `PyTorch` and later on we will use `Ray` to scale the training.
+As I mentioned earlier, I am quite new to distributed training, and at present I'm still in `epoch` 1 of my journey :). 
+
+Before I get started I would like to thank few of the brilliant researchers, professors, like **Prof Tanmoy Chakraborty**, **Dr Yatin Nandwani** and **Prof. Song Han**. My mentor/teacher **Rohan Shravan**, for his exceptional teaching, guidance and coaching over the years. And also to few of my colleagues and friends like **Dipankar Ranjan Baisya**, **Chris Fregly**, **Zachary Mueller**, **Ram Mohan**, **Debanjan Saha** and **Siddhant Gupta** who have made this journey possible for me. 
+
+Most of the content in this blog post is based on the work and lectures of these brilliant researchers, professors, and my mentors/teachers. You can find all the references and further resources at the end of the blog post.
 
 ## Deep Learning Training Basics
 
@@ -1347,7 +1380,7 @@ Ray Train's architecture is based on the following components:
 2. Ray Train Workers that execute the training code
 
 <p align="center">
-  <img src="assets/ray_train_01.png" loading="lazy" width="700"/>
+  <img src="assets/ray_train__01.png" width="700"/>
 </p>
 
 Below are the key API concepts of Ray Train:

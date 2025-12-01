@@ -299,16 +299,84 @@ window.Quarto = {
 
 <section id="introduction" class="level2">
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
-<p>Assume that you are preparing for a marathon. If you plot <strong>your performance</strong> versus <strong>amount of training hours you put in</strong>, the relationship is non-linear, performance gains begin to diminish after a certain point (as we will hit the human capacity).</p>
+<p>Deep learning models are becoming massive, and so are the challenges of training them. I am quite new to distributed training, and at present I am trying to learn how to scale the training to multiple GPUs and multiple machines using different forms of parallelism.</p>
+<p>And in the process, I found that more than the training or the algorithm itself, it is about understanding how distributed systems work and how to manage resources (GPUs and CPUs) efficiently.</p>
 <p align="center">
-<img src="assets/performance-vs-training-hours.png" alt="Performance vs Training Hours" width="50%">
+<img src="assets/model_params.png" alt="Model Parameters vs Training Time" width="100%">
 </p>
-<p>This concept holds true for LLMs as well. For example, in the LLaMA family (shown below), as the model size increases, the performance improves but the training time increases. The size of the circle represents the size of the model. And here we can see that as the model size increases, the performance improves but the training time increases.</p>
+<p>As models grow in size and complexity, the time required to train them is skyrocketing, sometimes taking days, weeks, or even months for a single epoch on one GPU.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 24%">
+<col style="width: 34%">
+<col style="width: 41%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Model</th>
+<th style="text-align: center;">Parameters<br>(Millions)</th>
+<th style="text-align: center;">Training Time on A100<br>(GPU Hours)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>ResNet-50</strong></td>
+<td style="text-align: center;">26</td>
+<td style="text-align: center;">31</td>
+</tr>
+<tr class="even">
+<td><strong>ResNet-101</strong></td>
+<td style="text-align: center;">45</td>
+<td style="text-align: center;">44</td>
+</tr>
+<tr class="odd">
+<td><strong>BERT-Base</strong></td>
+<td style="text-align: center;">108</td>
+<td style="text-align: center;">84</td>
+</tr>
+<tr class="even">
+<td><strong>Turing-NLG 17B</strong></td>
+<td style="text-align: center;">17,000</td>
+<td style="text-align: center;">TBA</td>
+</tr>
+<tr class="odd">
+<td><strong>GPT-3 175B</strong></td>
+<td style="text-align: center;">175,000</td>
+<td style="text-align: center;">3,100,000</td>
+</tr>
+</tbody>
+</table>
+<p>If we look at this table, we can see the dramatic growth in model parameter counts and the corresponding jump in training time requirements:</p>
+<ul>
+<li><strong>ResNet-50 and ResNet-101</strong> are manageable on a single GPU, but BERT-Base is already pushing the envelope.</li>
+<li><strong>Turing-NLG 17B</strong> and especially <strong>GPT-3 175B</strong> are in a completely different league, requiring immense computing power and time.</li>
+</ul>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If we tried to train GPT-3 on a single GPU, it would take roughly <strong>355 years</strong> to finish. Distributed training is not just useful, it’s absolutely essential as model sizes and training time requirements soar</p>
+</div>
+</div>
+<p>But why is this happening? Let’s set the stage with some striking observations:</p>
+<ul>
+<li>Model sizes and GPU demand are exploding.</li>
+<li>Training hours required can reach into the millions for cutting-edge models.</li>
+</ul>
+<p>Consider the <code>LLaMA</code> family of models. The graph below shows that as you scale up model size (circle diameter), performance increases but so does the training time. Look at the y-axis: we’re talking <em>millions</em> of GPU hours! Training even one of these models on a single GPU isn’t just slow, it’s practically impossible.</p>
 <p align="center">
 <img src="assets/model-size-vs-performance.png" alt="Model Size vs Performance" width="70%">
 </p>
-<p>But then it requires more training. The number of GPU hours required for training are really huge. If you see the <code>y-axis</code>, it is measured in <code>millions of GPU hours</code>. So how are we supposed to do it in one lifetime if we were to do it on one GPU? It is not feasible.</p>
-<p>So, we need to focus on how we can <strong>efficiently exploit multiple GPUs</strong> using different forms of parallelism. And in this blog, we will look at how to do that and what are the different forms of parallelism available and how we can implement them from scratch using <code>PyTorch</code> and later on we will use <code>Ray</code> to scale the training.</p>
+<p>In this blog post, we’ll try to understand distributed training from first principles and how to scale the training to multiple GPUs and multiple machines using different forms of parallelism. We will also look at how to implement these techniques from scratch using <code>PyTorch</code> and later on we will use <code>Ray</code> to scale the training.</p>
+<p>As I mentioned earlier, I am quite new to distributed training, and at present I’m still in <code>epoch</code> 1 of my journey :).</p>
+<p>Before I get started I would like to thank few of the brilliant researchers, professors, like <strong>Prof Tanmoy Chakraborty</strong>, <strong>Dr Yatin Nandwani</strong> and <strong>Prof.&nbsp;Song Han</strong>. My mentor/teacher <strong>Rohan Shravan</strong>, for his exceptional teaching, guidance and coaching over the years. And also to few of my colleagues and friends like <strong>Dipankar Ranjan Baisya</strong>, <strong>Chris Fregly</strong>, <strong>Zachary Mueller</strong>, <strong>Ram Mohan</strong>, <strong>Debanjan Saha</strong> and <strong>Siddhant Gupta</strong> who have made this journey possible for me.</p>
+<p>Most of the content in this blog post is based on the work and lectures of these brilliant researchers, professors, and my mentors/teachers. You can find all the references and further resources at the end of the blog post.</p>
 </section>
 <section id="deep-learning-training-basics" class="level2">
 <h2 class="anchored" data-anchor-id="deep-learning-training-basics">Deep Learning Training Basics</h2>
@@ -1728,7 +1796,7 @@ Your browser does not support the video tag. </video> <br> <em>Distributed Train
 1. A Ray Train Controller/Driver that schedules the training workers, handles errors, and manages checkpoints<br>
 2. Ray Train Workers that execute the training code</p>
 <p align="center">
-<img src="assets/ray_train_01.png" loading="lazy" width="700">
+<img src="assets/ray_train__01.png" width="700">
 </p>
 <p>Below are the key API concepts of Ray Train:</p>
 <ol type="1">
