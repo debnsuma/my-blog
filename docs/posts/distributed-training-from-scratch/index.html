@@ -8,9 +8,9 @@
 
 <meta name="author" content="Suman Debnath">
 <meta name="dcterms.date" content="2025-11-30">
-<meta name="description" content="A comprehensive guide to understanding and implementing distributed training for deep learning models from first principles">
+<meta name="description" content="In this blog, we’ll explore distributed training together, breaking down the core concepts and hands-on techniques for scaling deep learning models across multiple GPUs and machines using PyTorch and Ray.">
 
-<title>Distributed Training From Scratch – My Blog</title>
+<title>From Single GPU to Clusters: A Practical Journey into Distributed Training with PyTorch and Ray – My Blog</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -184,10 +184,10 @@ window.Quarto = {
 <header id="title-block-header" class="quarto-title-block default page-columns page-full">
   <div class="quarto-title-banner page-columns page-full">
     <div class="quarto-title column-body">
-      <h1 class="title">Distributed Training From Scratch</h1>
+      <h1 class="title">From Single GPU to Clusters: A Practical Journey into Distributed Training with PyTorch and Ray</h1>
                   <div>
         <div class="description">
-          A comprehensive guide to understanding and implementing distributed training for deep learning models from first principles
+          In this blog, we’ll explore distributed training together, breaking down the core concepts and hands-on techniques for scaling deep learning models across multiple GPUs and machines using PyTorch and Ray.
         </div>
       </div>
                           <div class="quarto-categories">
@@ -272,14 +272,14 @@ window.Quarto = {
   <li><a href="#distributed-training-with-ray-train" id="toc-distributed-training-with-ray-train" class="nav-link" data-scroll-target="#distributed-training-with-ray-train">Distributed Training with Ray Train</a>
   <ul class="collapse">
   <li><a href="#ray-train-architecture" id="toc-ray-train-architecture" class="nav-link" data-scroll-target="#ray-train-architecture">Ray Train Architecture</a></li>
-  <li><a href="#ray-data-ray-train-integration" id="toc-ray-data-ray-train-integration" class="nav-link" data-scroll-target="#ray-data-ray-train-integration">Ray Data + Ray Train Integration</a></li>
+  <li><a href="#ray-data-and-ray-train-integration" id="toc-ray-data-and-ray-train-integration" class="nav-link" data-scroll-target="#ray-data-and-ray-train-integration">Ray Data and Ray Train Integration</a></li>
   </ul></li>
   <li><a href="#setup-the-environment" id="toc-setup-the-environment" class="nav-link" data-scroll-target="#setup-the-environment">Setup the Environment</a></li>
   <li><a href="#distributed-training-with-ray-train-and-pytorch-fsdp" id="toc-distributed-training-with-ray-train-and-pytorch-fsdp" class="nav-link" data-scroll-target="#distributed-training-with-ray-train-and-pytorch-fsdp">Distributed Training with Ray Train and PyTorch FSDP</a>
   <ul class="collapse">
   <li><a href="#specify-cluster-scaling" id="toc-specify-cluster-scaling" class="nav-link" data-scroll-target="#specify-cluster-scaling">1. Specify Cluster Scaling</a></li>
   <li><a href="#data-preparation-pytorch-dataloaders" id="toc-data-preparation-pytorch-dataloaders" class="nav-link" data-scroll-target="#data-preparation-pytorch-dataloaders">2. Data Preparation: PyTorch DataLoaders</a></li>
-  <li><a href="#define-the-training-function" id="toc-define-the-training-function" class="nav-link" data-scroll-target="#define-the-training-function">3. Define the Training Function</a></li>
+  <li><a href="#define-the-training-function-1" id="toc-define-the-training-function-1" class="nav-link" data-scroll-target="#define-the-training-function-1">3. Define the Training Function</a></li>
   <li><a href="#configure-run-checkpointing-and-storage" id="toc-configure-run-checkpointing-and-storage" class="nav-link" data-scroll-target="#configure-run-checkpointing-and-storage">4. Configure Run Checkpointing and Storage</a></li>
   <li><a href="#launch-training-with-torchtrainer" id="toc-launch-training-with-torchtrainer" class="nav-link" data-scroll-target="#launch-training-with-torchtrainer">5. Launch Training with TorchTrainer</a></li>
   <li><a href="#load-and-use-checkpoints" id="toc-load-and-use-checkpoints" class="nav-link" data-scroll-target="#load-and-use-checkpoints">6. Load and Use Checkpoints</a></li>
@@ -373,8 +373,8 @@ Note
 <p align="center">
 <img src="assets/model-size-vs-performance.png" alt="Model Size vs Performance" width="70%">
 </p>
-<p>In this blog post, we’ll explore distributed training from the ground up—learning how to scale deep learning to multiple GPUs and machines with various parallelism techniques. We’ll see how to implement these strategies from scratch using <code>PyTorch</code>, then level up by using <code>Ray</code> for scalable training.</p>
-<p>As I mentioned, I’m still in <code>epoch</code> 1 of my distributed training journey! And as I learn more shall keep updating this writeup.</p>
+<p>In this blog post, we’ll explore distributed training from the ground up, learning how to scale deep learning to multiple GPUs and machines with various parallelism techniques. We’ll see how to implement these strategies from scratch using <code>PyTorch</code>, then level up by using <code>Ray</code> for scalable training.</p>
+<p>As I mentioned, I’m still in the first epoch of my distributed training journey! And as I learn more shall keep updating this writeup.</p>
 <p>Before I dive in, I’d like to thank some of the brilliant minds, mentors, and friends who’ve helped me along the way: <strong>Prof.&nbsp;Tanmoy Chakraborty</strong>, <strong>Dr.&nbsp;Yatin Nandwani</strong>, <strong>Prof.&nbsp;Song Han</strong>, my mentor <strong>Rohan Shravan</strong> (for his exceptional teaching and guidance over the years), and friends/colleagues like <strong>Dipankar Ranjan Baisya</strong>, <strong>Chris Fregly</strong>, <strong>Zachary Mueller</strong>, <strong>Ram Mohan</strong>, <strong>Debanjan Saha</strong>, and <strong>Siddhant Gupta</strong>.</p>
 <p>Most of the content here is inspired by their work, lectures, and advice. All references and resources are at the end of this post.</p>
 </section>
@@ -499,7 +499,7 @@ The intermediate outputs of each layer, which are necessary for gradient computa
 <p>Adam maintains two additional FP32 (4-byte) tensors per parameter: the <strong>first moment</strong> (mean of gradients, <span class="math inline">\(m\)</span>) and the <strong>second moment</strong> (uncentered variance, <span class="math inline">\(v\)</span>). Thus, for each parameter, Adam stores <span class="math inline">\(4\)</span> bytes for <span class="math inline">\(m\)</span> and <span class="math inline">\(4\)</span> bytes for <span class="math inline">\(v\)</span>, totaling <span class="math inline">\(8\Psi\)</span> bytes.</p>
 </div>
 </div>
-<p>When optimizing large models, memory management becomes an art. Modern LLM training uses <strong>mixed precision</strong>—typically BF16 (2 bytes) for fast compute, but still maintaining an FP32 (4 bytes) copy for weights and optimizer states to preserve accuracy.</p>
+<p>When optimizing large models, memory management becomes an art. Modern LLM training uses <strong>mixed precision</strong>, typically BF16 (2 bytes) for fast compute, but still maintaining an FP32 (4 bytes) copy for weights and optimizer states to preserve accuracy.</p>
 <div class="callout callout-style-default callout-tip callout-titled" title="Mixed Precision Training">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -620,7 +620,7 @@ The intermediate outputs of each layer, which are necessary for gradient computa
 <p>In LLM pre-training, batch size typically means <strong>number of tokens</strong>, not sequences. Token batch size is simply <strong>sequence length × micro-batch size</strong>.</p>
 </div>
 </div>
-<p>Real-world pre-training uses massive global batch sizes—often <strong>millions of tokens</strong>. In practice, training begins with smaller batches (for noisy, fast progress), then scales up batch size for stability and accuracy as you approach convergence.</p>
+<p>Real-world pre-training uses massive global batch sizes, often <strong>millions of tokens</strong>. In practice, training begins with smaller batches (for noisy, fast progress), then scales up batch size for stability and accuracy as you approach convergence.</p>
 <ul>
 <li><strong>Small batches:</strong> Early phase, high loss, helps the model learn quickly.</li>
 <li><strong>Big batches:</strong> Later phase, less noise, more stable gradients.</li>
@@ -914,7 +914,7 @@ The intermediate outputs of each layer, which are necessary for gradient computa
 <section id="the-limitations-of-simple-data-parallelism-dp" class="level2">
 <h2 class="anchored" data-anchor-id="the-limitations-of-simple-data-parallelism-dp">The Limitations of Simple Data Parallelism (DP)</h2>
 <p>Now that we’ve explored how to scale up training on multiple GPUs using Data Parallelism, a natural question arises: does this scaling result in perfect, linear performance gains? In other words, do we get proportional speedup as we add more GPUs?</p>
-<p>The reality is more nuanced. Although data parallelism cleverly overlaps the all-reduce gradient synchronization with backward computation, these efficiency gains don’t hold up indefinitely. As the number of GPUs increases—into the hundreds or thousands, the cost of coordination and the demands on the networking infrastructure start to rise quickly. Eventually, with each additional GPU, the improvements in throughput diminish, and the overall system efficiency drops.</p>
+<p>The reality is more nuanced. Although data parallelism cleverly overlaps the all-reduce gradient synchronization with backward computation, these efficiency gains don’t hold up indefinitely. As the number of GPUs increases, into the hundreds or thousands, the cost of coordination and the demands on the networking infrastructure start to rise quickly. Eventually, with each additional GPU, the improvements in throughput diminish, and the overall system efficiency drops.</p>
 <p align="center">
 <img src="assets/dp_perf.png" alt="Data Parallelism Limitations" width="100%">
 </p>
@@ -1351,22 +1351,21 @@ The intermediate outputs of each layer, which are necessary for gradient computa
 </section>
 <section id="introduction-to-ray---unified-ai-compute-engine" class="level1">
 <h1>Introduction to Ray - <code>Unified AI Compute Engine</code></h1>
-<p>Now that we’ve explored the <strong>ZeRO</strong> stages and different data parallel strategies, let’s discuss how to put these techniques into practice using <strong>Ray</strong> and <strong>PyTorch</strong> and, crucially, why <strong>Ray</strong> is such a good fit for large-scale distributed training in real-world settings.</p>
+<p>Now that we’ve explored the <strong>ZeRO</strong> stages and different data parallel strategies, let’s discuss how to put these techniques into practice using <strong>Ray</strong> and <strong>PyTorch</strong>, and why <strong>Ray</strong> is such a good fit for large-scale distributed training in real-world settings.</p>
 <p>Until now, we’ve mostly focused on how to leverage multiple GPUs within a single machine. However, scaling up modern deep learning requires distributing the training job not just across several GPUs, but often across many different machines as well.</p>
-<p>This introduces a host of new challenges - from launching and configuring clusters, to monitoring jobs, handling failures, and minimizing the engineering overhead when scaling up and down.</p>
+<p>This introduces a host of new challenges from launching and configuring clusters, to monitoring jobs, handling failures, and minimizing the engineering overhead when scaling up and down.</p>
 <p>When moving to <strong>distributed training</strong> at scale, several key requirements and challenges emerge in practice:</p>
 <ul>
 <li><strong>Scalability and Speed:</strong> Training jobs should be able to leverage more GPUs and machines to finish faster, without painful setup.</li>
 <li><strong>Easy Infrastructure Management:</strong> We shouldn’t need to spend time manually setting up or configuring clusters, whether on cloud or on-premises resources.</li>
 <li><strong>Visibility and Monitoring:</strong> It must be easy to track metrics, logs, and failures across all nodes, so debugging and monitoring don’t turn into a bottleneck.</li>
-<li><strong>Reliability and Fault Tolerance:</strong> Hardware failures, network issues, or preempted nodes shouldn’t force us to restart training from scratch—resilience and checkpointing are critical.</li>
+<li><strong>Reliability and Fault Tolerance:</strong> Hardware failures, network issues, or preempted nodes shouldn’t force us to restart training from scratch, resilience and checkpointing are critical.</li>
 <li><strong>Minimal Code Changes:</strong> Adapting our code for distributed training shouldn’t require a major rewrite of training logic.</li>
 </ul>
 <p><strong>Ray</strong> provides solutions for all of these requirements (and more), making it a compelling choice for large-scale distributed deep learning.</p>
-<p>By abstracting away the pain points of distributed systems, Ray lets us <code>scale</code> from laptop to GPU cluster without major workflow changes or infrastructure headaches.</p>
 <p>In the sections that follow, we’ll see concrete code and recipes showing how easy Ray makes it to scale PyTorch training seamlessly, from simple data parallel jobs to advanced ZeRO and FSDP setups. But before that let’s spend some time to understand what <strong>Ray</strong> is and how it works.</p>
-<p><strong>Ray</strong> is an open-source, unified AI Compute Engine designed to scale Python applications, especially AI/ML workloads, from a single laptop to clusters with thousands of machines, all with minimal code changes.</p>
-<p>At the core of <strong>Ray</strong> is <code>Ray Core</code>, a low-level distributed computing framework featuring a simple, Pythonic API for building and scaling any kind of distributed applications.</p>
+<p><strong>Ray</strong> is an open-source, unified AI Compute Engine designed to scale Python applications, especially AI/ML workloads, from a single machine to clusters with thousands of machines, all with minimal code changes.</p>
+<p>At the core of <strong>Ray</strong> is <code>Ray Core</code>, a low-level distributed computing framework which provides a simple, Pythonic API for building and scaling any distributed applications.</p>
 <p align="center">
 <img src="assets/ray_01.png" alt="Ray" width="100%">
 </p>
@@ -1386,20 +1385,20 @@ The intermediate outputs of each layer, which are necessary for gradient computa
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong>Ray</strong> handles the difficult parts, like task scheduling, node failures, data transfers, and more behind the scenes so you don’t have to. As an ML engineer or researcher, you can focus on your model, algorithm, and data, while <strong>Ray</strong> takes care of the complexities of distributed systems and distributed training.</p>
+<p><strong>Ray</strong> handles the difficult parts, like task scheduling, node failures, data transfers, and more behind the scenes so you don’t have to. As an ML engineer or researcher, you can focus on your model, algorithm, and data, while <strong>Ray</strong> takes care of the complexities of distributed systems.</p>
 </div>
 </div>
 </section>
 <section id="an-example-for-stateless-tasks-tasks" class="level2">
 <h2 class="anchored" data-anchor-id="an-example-for-stateless-tasks-tasks">An example: For <code>Stateless</code> Tasks (Tasks)</h2>
-<p>Let’s try to understand the <em>core primitives</em> of Ray, <code>tasks</code> and <code>actors</code> with an example. Imagine you’re building a simple app where you need to process a batch of images with a slow transformation (invert the colors).</p>
-<p>At first, you write a <code>for-loop</code> to process the images sequentially. It works, but it’s sluggish, using only a single CPU core, even if your laptop has eight. What if you need to process hundreds or thousands of images? This is where <strong>Ray</strong> comes in, and a world of instant scalability.</p>
-<p>Below, we walk step-by-step through the journey: from a plain, sequential Python function—painfully slow! to a parallel powerhouse processed by using Ray Tasks, and finally to coordinated, stateful parallelism with Ray Actors.</p>
+<p>Let’s try to understand the core primitives of <strong>Ray</strong>, <code>tasks</code> and <code>actors</code> with an example. Imagine you’re building a simple app where you need to process a batch of images with a simple transformation (like inverting the colors).</p>
+<p>At first, you write a <code>for-loop</code> to process the images sequentially. It works, but it’s sluggish, using only a single CPU core, even if your machine has lets say eight cores. What if you need to process hundreds or thousands of images? This is where <strong>Ray</strong> comes in, and a world of instant scalability.</p>
+<p>Below, we walk step-by-step through the journey: from a plain, sequential Python function, which is painfully slow! to a parallel powerhouse processed by using <strong>Ray Tasks</strong>, and finally to coordinated, stateful parallelism with <strong>Ray Actors</strong>.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-8-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-1" role="tab" aria-controls="tabset-8-1" aria-selected="true" href="">Step 1. The Baseline: Sequential Processing</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-8-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-2" role="tab" aria-controls="tabset-8-2" aria-selected="false" href="">Step 2. Parallel Ray Task (Fast)</a></li></ul>
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-8-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-1" role="tab" aria-controls="tabset-8-1" aria-selected="true" href="">Step 1. Sequential Processing (Slow)</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-8-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-2" role="tab" aria-controls="tabset-8-2" aria-selected="false" href="">Step 2. Parallel Ray Task (Fast)</a></li></ul>
 <div class="tab-content">
 <div id="tabset-8-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-8-1-tab">
-<p>We start at square one with a classic slow <code>for-loop</code>. Each image is processed one after another, burning a whole second per image. With 8 images, that’s 8 seconds to process all the images.</p>
+<p>Each image is processed one after another, burning a whole second per image. With 8 images, that’s 8 seconds to process all the images.</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># sequential_process.py</span></span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
 <span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
@@ -1420,7 +1419,8 @@ The intermediate outputs of each layer, which are necessary for gradient computa
 <p>Our code works, but only uses a single core, leaving the rest idle. Not a good situation. Let’s try to parallelize it using <code>Ray Tasks</code>.</p>
 </div>
 <div id="tabset-8-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-8-2-tab">
-<p>Now, let’s use Ray to parallelize the image processing. Ray’s <code>@ray.remote</code> decorator instantly upgrades your function to run in parallel, one copy per available CPU core. By switching to <code>.remote()</code> calls, you launch as many parallel jobs as you have CPUs, and gather results with <code>ray.get()</code>.</p>
+<p>Now, let’s use Ray to parallelize the image processing.</p>
+<p><strong>Ray’s</strong> <code>@ray.remote</code> decorator instantly makes your function run in parallel, one copy per available CPU core.</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># parallel_process.py</span></span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> ray</span>
 <span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
@@ -1455,8 +1455,8 @@ The intermediate outputs of each layer, which are necessary for gradient computa
 <ul>
 <li>We decorated the function with <code>@ray.remote</code> decorator to make it a remote task.</li>
 <li>We called the function with <code>.remote()</code> to launch it as a remote task.</li>
-<li>We waited for the results with <code>ray.get()</code>.</li>
-<li>The secret here is the <code>ObjectRef</code>: each <code>.remote()</code> call sends off a job in the background, while your main code keeps going. When you call <code>ray.get(result_refs)</code>, Ray assembles all results when they’re ready.</li>
+<li>We then wait for the results by calling <code>ray.get()</code> on the <code>ObjectRefs</code> returned by the <code>remote</code> calls.</li>
+<li>The secret here is the <code>ObjectRef</code>, each <code>.remote()</code> call sends off a job in the background, while your main code keeps going. When you call <code>ray.get(result_refs)</code>, <strong>Ray</strong> assembles all results when they are ready.</li>
 </ul>
 </div>
 </div>
@@ -1477,9 +1477,9 @@ The intermediate outputs of each layer, which are necessary for gradient computa
 </section>
 <section id="going-further-for-stateful-tasks-actors" class="level2">
 <h2 class="anchored" data-anchor-id="going-further-for-stateful-tasks-actors">Going Further: For <code>Stateful</code> Tasks (Actors)</h2>
-<p>The beauty of Ray is that it doesn’t just parallelize our work, it also gives us the right tool for <strong>sharing state across those jobs</strong>. Imagine that you want a running tally (say, the total number of pixels processed across all images), but you can’t use a global variable, because each parallel job runs isolated.</p>
+<p>The beauty of Ray is that it doesn’t just parallelize our work, it also gives us the right tool for <strong>sharing state</strong> across those jobs. Imagine that you want a running tally (say, the total number of pixels processed across all images), but you can’t use a global variable, because each parallel job runs isolated.</p>
 <p>What you really want is a service: <em>a live, remote counter</em> that all jobs can update in real-time. That’s what is known as an <code>Actor</code> in Ray: a class with its own persistent state, living somewhere on the cluster.</p>
-<p>Let’s see how to create and use an Actor.</p>
+<p>Let’s see how to create and use an Actor for any <code>stateful</code> task.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
 <ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-9-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-9-1" role="tab" aria-controls="tabset-9-1" aria-selected="true" href="">Ray Actor (Stateful)</a></li></ul>
 <div class="tab-content">
@@ -1538,24 +1538,20 @@ The intermediate outputs of each layer, which are necessary for gradient computa
 <span id="cb17-52"><a href="#cb17-52" aria-hidden="true" tabindex="-1"></a>ray.shutdown()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><strong>What we did differently?</strong></p>
 <ul>
-<li>Our stateless Ray Tasks each process an image, but the Actor (the remote <code>PixelCounter</code> class) lives on, safely tallying up the total pixel count as tasks report in.</li>
-<li>The Actor’s state persists across many requests, letting you coordinate and aggregate information even in a distributed, parallel environment.</li>
-<li>The only change from earlier?
-<ul>
-<li>Define a <code>@ray.remote</code> class (<code>PixelCounter</code>).</li>
-<li>Pass its handle to your tasks so they can call <code>add.remote()</code>.</li>
-</ul></li>
+<li>Previously, with <strong>Ray Tasks</strong>, each task independently processed an image in a <code>stateless</code> way. Now, by with the Actor (the remote <code>PixelCounter</code> class), we can safely accumulate the total pixel count as each task reports in.</li>
+<li>The Actor’s state is persistent across many requests, enabling us to coordinate and aggregate information even in a distributed, parallel environment.</li>
+<li>The key difference from before is that we now define a <code>@ray.remote</code> class (<code>PixelCounter</code>) and pass its handle to the tasks, so they can call <code>add.remote()</code> to update the shared state.</li>
 </ul>
 </div>
 </div>
 </div>
-<p>This pattern of combining <strong>Ray Tasks</strong> for stateless (think of Python functions), independent work and <strong>Ray Actors</strong> (think of Python classes) for shared state, is the foundation of scalable Python pipelines for any real-world application (not just any AI applications). And we can build anything with this and make it scalable.</p>
-<p>Ray’s primitives empower us to build scalable, reliable, and maintainable distributed applications, without rewriting all our code or micro-managing threads and processes.</p>
+<p>This pattern of combining <strong>Ray Tasks</strong> for <code>stateless</code> (think of Python functions), independent work and <strong>Ray Actors</strong> for <code>stateful</code> (think of Python classes) is the foundation of scalable Python pipelines for any real-world application (not just any AI applications).</p>
+<p><strong>Ray’s</strong> primitives empower us to build scalable, reliable, and maintainable distributed applications, without rewriting all our code or micro-managing threads and processes.</p>
 </section>
 <section id="ray-for-different-ai-workloads" class="level2">
 <h2 class="anchored" data-anchor-id="ray-for-different-ai-workloads">Ray for Different AI Workloads</h2>
-<p>While Ray Core provides the low-level primitives for building distributed applications, it is not the only or always the best option, especially for <strong>specialized AI workloads</strong>. That’s why Ray offers higher-level abstractions tailored to specific AI tasks like <strong>data processing, training, hyperparameter search, RL and model serving</strong>.</p>
-<p>Ray provides advanced AI Libraries such as:</p>
+<p>While Ray Core provides the low-level primitives for building distributed applications, it is not the only or always the best option, especially for <strong>specialized AI workloads</strong>.</p>
+<p>It also offers higher-level abstractions tailored to specific AI tasks like <code>data processing</code>, <code>training</code>, <code>hyperparameter search</code>, <code>RL</code> and <code>model serving</code>.</p>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -1609,14 +1605,14 @@ The intermediate outputs of each layer, which are necessary for gradient computa
 </div>
 <div class="callout-body-container callout-body">
 <p>If Ray Core’s Tasks and Actors are this powerful, why bother with higher-level Ray libraries like Ray Train or Ray Data?</p>
-<p>The answer: <strong>Abstraction and Specialization</strong>. While it’s technically possible to build a full distributed training pipeline with only Ray Core, that approach means you shoulder all the complexities—manual data sharding, synchronization (e.g., for PyTorch DDP), distributed checkpointing, fault tolerance, handling resuming, and hyperparameter search. That’s a lot of boilerplate and risk!</p>
+<p>Simple answer is <strong>Abstraction and Specialization</strong>. While it’s technically possible to build a full distributed training pipeline with only Ray Core, that approach means you shoulder all the complexities, like manual data sharding, synchronization (e.g., for PyTorch DDP), distributed checkpointing, fault tolerance, handling resuming, and hyperparameter search. That’s a lot of boilerplate and risk!</p>
 </div>
 </div>
-<p>Not only that it also have tight integration with popular frameworks like <code>PyTorch</code>, <code>vLLM</code>, <code>Hugging Face</code>, and more.</p>
+<p>It also has tight integration with popular frameworks like <code>PyTorch</code>, <code>vLLM</code>, <code>Hugging Face</code>, and more.</p>
 <p align="center">
 <img src="assets/ray_02.png" alt="Ray" width="100%">
 </p>
-<p>This unified ecosystem empowers us to build end-to-end distributed AI workflows. Every component from ingest to training to serving, scales seamlessly from our laptop to a full cluster.</p>
+<p>This unified ecosystem empowers us to build end-to-end distributed AI workflows.</p>
 <p>In this blog, we’ll focus on distributed training with <code>Ray Train</code>, showing how it can scale our PyTorch training from a single GPU to a full cluster almost effortlessly.</p>
 <div class="callout callout-style-default callout-warning callout-titled" title="Why Not Use Only PyTorch Distributed?">
 <div class="callout-header d-flex align-content-center">
@@ -1628,17 +1624,16 @@ The intermediate outputs of each layer, which are necessary for gradient computa
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>While <strong>PyTorch Distributed</strong> (such as DDP) is an excellent built-in solution for multi-GPU training, it’s primarily designed for <em>single-node</em> or <em>homogeneous, tightly-coupled clusters</em>. If you’re just scaling to multiple GPUs on one machine, PyTorch’s distributed tools are often enough. And you can run your training job with <code>torchrun</code> command.</p>
+<p>While <strong>PyTorch Distributed</strong> (such as DDP) is an excellent built-in solution for multi-GPU training, it’s primarily designed for <em>single-node</em> or <em>homogeneous, tightly-coupled clusters</em>. If you’re just scaling to multiple GPUs on one machine, PyTorch’s distributed tools/APIs are often enough. And you can run your training job with <code>torchrun</code> command.</p>
 <p>However, <strong>the challenges multiply dramatically the moment you want to scale across several machines or need to orchestrate complex workflows</strong>. Tasks like:</p>
 <ul>
 <li>Launching jobs and synchronizing them across machines,</li>
 <li>Managing different workers, node failures, and resuming or monitoring experiments,</li>
 <li>Efficiently using both CPUs (for pre-processing and data loading) and GPUs (for training/inference) in one seamless workflow,</li>
-<li>Sharding and streaming large datasets not just for one epoch, but for repeated, distributed, and fault-tolerant training,</li>
+<li>Sharding and streaming large datasets not just for one epoch, but for repeated, distributed, and fault-tolerant training, becomes <strong>painful and complex</strong> with only PyTorch’s stock tools.</li>
 </ul>
-<p>become <strong>painful and complex</strong> with only PyTorch’s stock tools.</p>
-<p>This is exactly where <strong>Ray shines</strong>.</p>
-<p>It’s abstracts away the low-level engineering required to run distributed workloads at scale. For instance, with <strong>Ray Train</strong> and <strong>Ray Data</strong>, you get seamless multi-GPU, multi-node orchestration, unified CPU-GPU pipelines, resilience and scalability. This helps you focus on your algorithms and models, rather than the underlying infrastructure.</p>
+<p>This is exactly where <strong>Ray</strong> shines.</p>
+<p>It abstracts away the low-level engineering required to run distributed workloads at scale. For instance, with <strong>Ray Train</strong> and <strong>Ray Data</strong>, you get seamless multi-GPU, multi-node orchestration, unified CPU-GPU pipelines, resilience and scalability. This helps you focus on your algorithms and models, rather than the underlying infrastructure.</p>
 </div>
 </div>
 </section>
@@ -1650,11 +1645,10 @@ The intermediate outputs of each layer, which are necessary for gradient computa
 <img src="assets/ray_03.png" alt="Distributed Training with Ray Train and PyTorch" width="100%">
 </p>
 <p>Before diving into distributed training, let’s establish a baseline by looking at a simple single-GPU training loop. This will help us understand what needs to change when we migrate to distributed training.</p>
-<p>Before we dive into distributed training, let’s first look at a <strong>simple, single-GPU PyTorch training loop</strong> as our baseline. This example will help ground the core steps that appear in almost any deep learning project, and by keeping things simple (no distributed libraries, no argument parsing), we make it crystal clear what needs to change later for multi-GPU or multi-node scaling.</p>
 <section id="single-gpu-pytorch-training-on-cifar-10" class="level2">
 <h2 class="anchored" data-anchor-id="single-gpu-pytorch-training-on-cifar-10">Single-GPU PyTorch Training on CIFAR-10</h2>
-<p>We’ll use a modern Vision Transformer model (<code>torchvision.models.VisionTransformer</code>) and the CIFAR-10 dataset. This code works on CPU, GPU (CUDA), or Apple MPS — but it’s strictly ordinary, non-distributed PyTorch.</p>
-<p>If you have trained any model with PyTorch on a single machine, you might have seen a similar training loop. The standard way to train a model with PyTorch on a single machine (single GPU) consists of these steps:</p>
+<p>We’ll use a <code>Vision Transformer</code> model (<code>torchvision.models.VisionTransformer</code>) and the <code>CIFAR-10</code> dataset. This code works on CPU, GPU (CUDA), or Apple MPS, but it’s strictly ordinary, non-distributed PyTorch.</p>
+<p>If you have trained any model with <strong>PyTorch</strong> on a single machine/colab notebook, you might have seen a similar training loop, where we:</p>
 <ol type="1">
 <li>Download and prepare the <code>dataset</code>
 <ul>
@@ -1675,7 +1669,11 @@ The intermediate outputs of each layer, which are necessary for gradient computa
 <p>This works perfectly for <em>one GPU or a single machine</em>, but doesn’t scale automatically. We’ll see soon how to migrate this to Ray Train for scaling, but for now, here’s the basic setup.</p>
 <section id="dataloader-function" class="level3">
 <h3 class="anchored" data-anchor-id="dataloader-function">DataLoader Function</h3>
-<p>This function sets up the <a href="https://pytorch.org/docs/stable/data.html">DataLoaders</a> for the CIFAR-10 training and test splits. Note: We use a <code>FileLock</code> to avoid concurrency issues if datasets are being downloaded.</p>
+<p>This function sets up the <a href="https://pytorch.org/docs/stable/data.html">DataLoaders</a> for the CIFAR-10 training and test splits.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-10-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-10-1" role="tab" aria-controls="tabset-10-1" aria-selected="true" href="">Define the DataLoader Function</a></li></ul>
+<div class="tab-content">
+<div id="tabset-10-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-10-1-tab">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> torchvision <span class="im">import</span> datasets, transforms</span>
 <span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> torchvision.transforms <span class="im">import</span> Normalize, ToTensor</span>
 <span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> torch.utils.data <span class="im">import</span> DataLoader</span>
@@ -1685,7 +1683,7 @@ The intermediate outputs of each layer, which are necessary for gradient computa
 <span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_dataloaders(batch_size):</span>
 <span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""</span></span>
 <span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a><span class="co">    Create standard PyTorch DataLoaders.</span></span>
-<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a><span class="co">    No distributed code — just vanilla PyTorch.</span></span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a><span class="co">    No distributed code, just vanilla PyTorch.</span></span>
 <span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
 <span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>    transform <span class="op">=</span> transforms.Compose([</span>
@@ -1705,10 +1703,30 @@ The intermediate outputs of each layer, which are necessary for gradient computa
 <span id="cb18-27"><a href="#cb18-27" aria-hidden="true" tabindex="-1"></a>    test_loader <span class="op">=</span> DataLoader(test_data, batch_size<span class="op">=</span>batch_size)</span>
 <span id="cb18-28"><a href="#cb18-28" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb18-29"><a href="#cb18-29" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> train_loader, test_loader</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Why use a FileLock?">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Why use a FileLock?
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>We use a <code>FileLock</code> to avoid concurrency issues if datasets are being downloaded.</p>
+</div>
+</div>
 </section>
 <section id="training-function" class="level3">
 <h3 class="anchored" data-anchor-id="training-function">Training Function</h3>
 <p>This is the standard PyTorch training loop, using <code>torchvision.models.VisionTransformer</code>.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-11-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-11-1" role="tab" aria-controls="tabset-11-1" aria-selected="true" href="">Define the Training Function</a></li></ul>
+<div class="tab-content">
+<div id="tabset-11-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-11-1-tab">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> torchvision.models <span class="im">import</span> VisionTransformer</span>
 <span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> torch <span class="im">import</span> nn</span>
 <span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
@@ -1783,6 +1801,9 @@ The intermediate outputs of each layer, which are necessary for gradient computa
 <span id="cb19-72"><a href="#cb19-72" aria-hidden="true" tabindex="-1"></a>    }</span>
 <span id="cb19-73"><a href="#cb19-73" aria-hidden="true" tabindex="-1"></a>    torch.save(checkpoint, <span class="st">'checkpoint_single_machine.pth'</span>)</span>
 <span id="cb19-74"><a href="#cb19-74" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Training completed! Final accuracy: </span><span class="sc">{</span><span class="dv">100</span> <span class="op">*</span> accuracy<span class="sc">:.2f}</span><span class="ss">%</span><span class="ch">\n</span><span class="ss">Checkpoint saved to checkpoint_single_machine.pth"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</div>
+</div>
 </section>
 <section id="training-the-model" class="level3">
 <h3 class="anchored" data-anchor-id="training-the-model">Training the Model</h3>
@@ -1792,13 +1813,13 @@ The intermediate outputs of each layer, which are necessary for gradient computa
 <img src="assets/gpu_01.png" alt="Training the Model" width="100%">
 </p>
 <p>As you can see, the model is trained on a single GPU while other GPUs are idle.</p>
-<p>This script represents <em>plain vanilla</em> PyTorch, suitable for a single GPU or single CPU. There is no distributed logic or Ray involved yet. All of the key logic, especially the <code>get_dataloaders</code> function and the structure of the <code>train_func</code> will remain mostly the same when we migrate to distributed training with Ray Train!</p>
+<p>This script represents plain vanilla <strong>PyTorch</strong>, suitable for a single GPU or single CPU. There is no distributed logic or <strong>Ray</strong> involved yet. All of the key logic, especially the <code>get_dataloaders</code> function and the structure of the <code>train_func</code> will remain mostly the same when we migrate to distributed training with <strong>Ray Train</strong>.</p>
 <p>Let’s now train the model at scale on multiple GPUs across multiple machines.</p>
 </section>
 </section>
 <section id="distributed-training-with-ray-train" class="level2">
 <h2 class="anchored" data-anchor-id="distributed-training-with-ray-train">Distributed Training with Ray Train</h2>
-<p>Now, let’s see how to migrate this <code>single-machine, single-GPU</code> training loop to <code>distributed training</code> using Ray Train and PyTorch on <code>multiple machines, multiple GPUs</code>.</p>
+<p>Now, let’s see how to migrate this <code>single-machine</code>, <code>single-GPU</code> training loop to <code>distributed training</code> using <strong>Ray Train</strong> and <strong>PyTorch</strong> on <code>multiple machines</code>, <code>multiple GPUs</code>.</p>
 <p align="center">
 <video controls="" width="700">
 <source src="assets/ray_train_01.mov" type="video/mp4">
@@ -1806,13 +1827,16 @@ Your browser does not support the video tag. </video> <br> <em>Distributed Train
 </p>
 <section id="ray-train-architecture" class="level3">
 <h3 class="anchored" data-anchor-id="ray-train-architecture">Ray Train Architecture</h3>
-<p>Ray Train’s architecture is based on the following components:<br>
-1. A Ray Train Controller/Driver that schedules the training workers, handles errors, and manages checkpoints<br>
-2. Ray Train Workers that execute the training code</p>
+<p><strong>Ray Train’s</strong> architecture is based on the following components:</p>
+<ol type="1">
+<li>A Ray Train <code>Controller/Driver</code> that schedules the training workers, handles errors, and manages checkpoints<br>
+</li>
+<li>Ray Train <code>Workers</code> that execute the training code</li>
+</ol>
 <p align="center">
 <img src="assets/ray_train__01.png" width="700">
 </p>
-<p>Below are the key API concepts of Ray Train:</p>
+<p>Below are the key API concepts of <strong>Ray Train</strong>:</p>
 <ol type="1">
 <li><code>train_loop_per_worker</code>: The core function that contains your model training logic<br>
 </li>
@@ -1826,22 +1850,22 @@ Your browser does not support the video tag. </video> <br> <em>Distributed Train
 <img src="assets/ray_train_02.png" width="700" loading="lazy">
 </p>
 </section>
-<section id="ray-data-ray-train-integration" class="level3">
-<h3 class="anchored" data-anchor-id="ray-data-ray-train-integration">Ray Data + Ray Train Integration</h3>
-<p>Here is a diagram showing the Ray Data and Ray Train integration.</p>
+<section id="ray-data-and-ray-train-integration" class="level3">
+<h3 class="anchored" data-anchor-id="ray-data-and-ray-train-integration">Ray Data and Ray Train Integration</h3>
+<p>Here is a diagram showing the <strong>Ray Data</strong> and <strong>Ray Train</strong> integration.</p>
 <p align="center">
 <img src="assets/ray_train_03.png" width="800" loading="lazy">
 </p>
-<p>We are not going to go into the details of Ray Data and Ray Train integration in this post. But if you are interested in learning more about it, you can check out the <a href="https://docs.ray.io/en/latest/data/index.html">Ray Data</a> and <a href="https://docs.ray.io/en/latest/train/index.html">Ray Train</a> documentation.</p>
+<p>We are not going to go into the details of Ray Data and Ray Train integration in this blog post. But if you are interested in learning more about it, you can check out the <a href="https://docs.ray.io/en/latest/train/user-guides/data-loading-preprocessing.html">Ray Data</a> documentation.</p>
 </section>
 </section>
 <section id="setup-the-environment" class="level2">
 <h2 class="anchored" data-anchor-id="setup-the-environment">Setup the Environment</h2>
-<p>To check how many GPUs (and CPUs) are available in your Ray cluster, you can use the script below:</p>
+<p>Before we start any training, let’s first check how many GPUs (and CPUs) are available in our <strong>Ray Cluster</strong>.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-10-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-10-1" role="tab" aria-controls="tabset-10-1" aria-selected="true" href="">Check Cluster GPUs</a></li></ul>
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-12-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-12-1" role="tab" aria-controls="tabset-12-1" aria-selected="true" href="">Check Cluster GPUs</a></li></ul>
 <div class="tab-content">
-<div id="tabset-10-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-10-1-tab">
+<div id="tabset-12-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-12-1-tab">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> ray</span>
 <span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
 <span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -1899,7 +1923,7 @@ Your browser does not support the video tag. </video> <br> <em>Distributed Train
 </div>
 </div>
 </div>
-<p>As you can see, the cluster which I have has a total of 8 GPUs. The cluster consists of a total of one Head Node and two Worker Nodes, where each worker node has 4 GPUs each.</p>
+<p>As you can see, the cluster which I have has a total of 8 GPUs. The cluster consists of a total of one Head Node and two Worker Nodes, with each worker node having 4 GPUs.</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb22"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="ex">============================================================</span></span>
 <span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="ex">Ray</span> Cluster GPU Information</span>
 <span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a><span class="ex">============================================================</span></span>
@@ -1922,16 +1946,27 @@ Your browser does not support the video tag. </video> <br> <em>Distributed Train
 <p>Now that we have understood the basics of Ray Train, and also have a Ray cluster ready, let’s now dive into distributed training with Ray Train and PyTorch FSDP.</p>
 <section id="specify-cluster-scaling" class="level3">
 <h3 class="anchored" data-anchor-id="specify-cluster-scaling">1. Specify Cluster Scaling</h3>
-<p>First, set up how many Ray workers (processes) will participate—typically one per GPU. For a Ray cluster with 8 GPUs:</p>
+<p>First, set up how many Ray workers (processes) will participate, typically one per GPU. For a Ray cluster with 8 GPUs:</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-13-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-13-1" role="tab" aria-controls="tabset-13-1" aria-selected="true" href="">Specify Cluster Scaling</a></li></ul>
+<div class="tab-content">
+<div id="tabset-13-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-13-1-tab">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>scaling_config <span class="op">=</span> ScalingConfig(</span>
-<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>    num_workers<span class="op">=</span><span class="dv">8</span>,  <span class="co"># e.g., 8 GPUs in your cluster</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>    num_workers<span class="op">=</span><span class="dv">8</span>,  <span class="co"># e.g., 8 GPUs in our cluster</span></span>
 <span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    use_gpu<span class="op">=</span><span class="va">True</span>,</span>
 <span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>    resources_per_worker<span class="op">=</span>{<span class="st">"CPU"</span>: <span class="dv">2</span>, <span class="st">"GPU"</span>: <span class="dv">1</span>},</span>
 <span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</div>
+</div>
 </section>
 <section id="data-preparation-pytorch-dataloaders" class="level3">
 <h3 class="anchored" data-anchor-id="data-preparation-pytorch-dataloaders">2. Data Preparation: PyTorch DataLoaders</h3>
-<p>Data preparation is unchanged from typical PyTorch or DDP usage. Use your usual transforms and DataLoader logic:</p>
+<p>Data preparation is unchanged from typical PyTorch or DDP usage. Use our usual transforms and DataLoader logic:</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-14-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-14-1" role="tab" aria-controls="tabset-14-1" aria-selected="true" href="">Define the DataLoaders</a></li></ul>
+<div class="tab-content">
+<div id="tabset-14-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-14-1-tab">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> torchvision <span class="im">import</span> datasets, transforms</span>
 <span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> torch.utils.data <span class="im">import</span> DataLoader</span>
 <span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> filelock <span class="im">import</span> FileLock</span>
@@ -1949,83 +1984,87 @@ Your browser does not support the video tag. </video> <br> <em>Distributed Train
 <span id="cb24-15"><a href="#cb24-15" aria-hidden="true" tabindex="-1"></a>        DataLoader(train_ds, batch_size<span class="op">=</span>batch_size, shuffle<span class="op">=</span><span class="va">True</span>),</span>
 <span id="cb24-16"><a href="#cb24-16" aria-hidden="true" tabindex="-1"></a>        DataLoader(valid_ds, batch_size<span class="op">=</span>batch_size),</span>
 <span id="cb24-17"><a href="#cb24-17" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</div>
+</div>
 <p>No special considerations are needed for FSDP at this stage.</p>
 </section>
-<section id="define-the-training-function" class="level3">
-<h3 class="anchored" data-anchor-id="define-the-training-function">3. Define the Training Function</h3>
-<p>Define your Ray Train worker function to train the model. This is the training function that will be executed by each worker. As the model is now being prepared for FSDP, we need to use the <code>prepare_model</code> function to prepare the model for FSDP.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
-<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
-<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> torch <span class="im">import</span> nn</span>
-<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> torchvision.models <span class="im">import</span> VisionTransformer</span>
-<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> ray</span>
-<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> tempfile</span>
-<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> train_func_per_worker(config):</span>
-<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>    lr <span class="op">=</span> config[<span class="st">"lr"</span>]</span>
-<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>    epochs <span class="op">=</span> config[<span class="st">"epochs"</span>]</span>
-<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>    batch_size <span class="op">=</span> config[<span class="st">"batch_size_per_worker"</span>]</span>
+<section id="define-the-training-function-1" class="level3">
+<h3 class="anchored" data-anchor-id="define-the-training-function-1">3. Define the Training Function</h3>
+<p>Next, let’s define the training function for the Ray Train worker. This is the training function that will be executed by each worker.</p>
+<p>As the model is now being prepared for FSDP, we need to use the <code>prepare_model</code> function to prepare the model for FSDP.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-15-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-15-1" role="tab" aria-controls="tabset-15-1" aria-selected="true" href="">Define the Training Function</a></li></ul>
+<div class="tab-content">
+<div id="tabset-15-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-15-1-tab">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> train_func_per_worker(config):</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>    lr <span class="op">=</span> config[<span class="st">"lr"</span>]</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>    epochs <span class="op">=</span> config[<span class="st">"epochs"</span>]</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>    batch_size <span class="op">=</span> config[<span class="st">"batch_size_per_worker"</span>]</span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>    ctx <span class="op">=</span> ray.train.get_context()</span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>    rank <span class="op">=</span> ctx.get_world_rank()</span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>    world_size <span class="op">=</span> ctx.get_world_size()</span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> rank <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"Training with FSDP across </span><span class="sc">{</span>world_size<span class="sc">}</span><span class="ss"> workers..."</span>)</span>
 <span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>    ctx <span class="op">=</span> ray.train.get_context()</span>
-<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a>    rank <span class="op">=</span> ctx.get_world_rank()</span>
-<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a>    world_size <span class="op">=</span> ctx.get_world_size()</span>
-<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb25-17"><a href="#cb25-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> rank <span class="op">==</span> <span class="dv">0</span>:</span>
-<span id="cb25-18"><a href="#cb25-18" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"Training with FSDP across </span><span class="sc">{</span>world_size<span class="sc">}</span><span class="ss"> workers..."</span>)</span>
-<span id="cb25-19"><a href="#cb25-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb25-20"><a href="#cb25-20" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Prepare DataLoaders for distributed training</span></span>
-<span id="cb25-21"><a href="#cb25-21" aria-hidden="true" tabindex="-1"></a>    train_dl, valid_dl <span class="op">=</span> get_dataloaders(batch_size)</span>
-<span id="cb25-22"><a href="#cb25-22" aria-hidden="true" tabindex="-1"></a>    train_dl <span class="op">=</span> ray.train.torch.prepare_data_loader(train_dl)</span>
-<span id="cb25-23"><a href="#cb25-23" aria-hidden="true" tabindex="-1"></a>    valid_dl <span class="op">=</span> ray.train.torch.prepare_data_loader(valid_dl)</span>
-<span id="cb25-24"><a href="#cb25-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb25-25"><a href="#cb25-25" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Define the model</span></span>
-<span id="cb25-26"><a href="#cb25-26" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> VisionTransformer(</span>
-<span id="cb25-27"><a href="#cb25-27" aria-hidden="true" tabindex="-1"></a>        image_size<span class="op">=</span><span class="dv">32</span>, patch_size<span class="op">=</span><span class="dv">4</span>,</span>
-<span id="cb25-28"><a href="#cb25-28" aria-hidden="true" tabindex="-1"></a>        num_layers<span class="op">=</span><span class="dv">12</span>, num_heads<span class="op">=</span><span class="dv">8</span>, hidden_dim<span class="op">=</span><span class="dv">384</span>, mlp_dim<span class="op">=</span><span class="dv">768</span>, num_classes<span class="op">=</span><span class="dv">10</span>,</span>
-<span id="cb25-29"><a href="#cb25-29" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb25-30"><a href="#cb25-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb25-31"><a href="#cb25-31" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Prepare the model for FSDP</span></span>
-<span id="cb25-32"><a href="#cb25-32" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> ray.train.torch.prepare_model(model, parallel_strategy<span class="op">=</span><span class="st">"fsdp"</span>)</span>
-<span id="cb25-33"><a href="#cb25-33" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb25-34"><a href="#cb25-34" aria-hidden="true" tabindex="-1"></a>    criterion <span class="op">=</span> nn.CrossEntropyLoss()</span>
-<span id="cb25-35"><a href="#cb25-35" aria-hidden="true" tabindex="-1"></a>    optimizer <span class="op">=</span> torch.optim.AdamW(model.parameters(), lr<span class="op">=</span>lr, weight_decay<span class="op">=</span><span class="fl">1e-2</span>)</span>
-<span id="cb25-36"><a href="#cb25-36" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb25-37"><a href="#cb25-37" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> epoch <span class="kw">in</span> <span class="bu">range</span>(epochs):</span>
-<span id="cb25-38"><a href="#cb25-38" aria-hidden="true" tabindex="-1"></a>        model.train()</span>
-<span id="cb25-39"><a href="#cb25-39" aria-hidden="true" tabindex="-1"></a>        total_loss, sample_cnt <span class="op">=</span> <span class="fl">0.0</span>, <span class="dv">0</span></span>
-<span id="cb25-40"><a href="#cb25-40" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> X, y <span class="kw">in</span> train_dl:</span>
-<span id="cb25-41"><a href="#cb25-41" aria-hidden="true" tabindex="-1"></a>            pred <span class="op">=</span> model(X)</span>
-<span id="cb25-42"><a href="#cb25-42" aria-hidden="true" tabindex="-1"></a>            loss <span class="op">=</span> criterion(pred, y)</span>
-<span id="cb25-43"><a href="#cb25-43" aria-hidden="true" tabindex="-1"></a>            optimizer.zero_grad()</span>
-<span id="cb25-44"><a href="#cb25-44" aria-hidden="true" tabindex="-1"></a>            loss.backward()</span>
-<span id="cb25-45"><a href="#cb25-45" aria-hidden="true" tabindex="-1"></a>            optimizer.step()</span>
-<span id="cb25-46"><a href="#cb25-46" aria-hidden="true" tabindex="-1"></a>            total_loss <span class="op">+=</span> loss.item() <span class="op">*</span> X.shape[<span class="dv">0</span>]</span>
-<span id="cb25-47"><a href="#cb25-47" aria-hidden="true" tabindex="-1"></a>            sample_cnt <span class="op">+=</span> X.shape[<span class="dv">0</span>]</span>
-<span id="cb25-48"><a href="#cb25-48" aria-hidden="true" tabindex="-1"></a>        train_loss <span class="op">=</span> total_loss <span class="op">/</span> sample_cnt</span>
-<span id="cb25-49"><a href="#cb25-49" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb25-50"><a href="#cb25-50" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Validation loop</span></span>
-<span id="cb25-51"><a href="#cb25-51" aria-hidden="true" tabindex="-1"></a>        model.<span class="bu">eval</span>()</span>
-<span id="cb25-52"><a href="#cb25-52" aria-hidden="true" tabindex="-1"></a>        valid_loss, correct, total <span class="op">=</span> <span class="fl">0.0</span>, <span class="dv">0</span>, <span class="dv">0</span></span>
-<span id="cb25-53"><a href="#cb25-53" aria-hidden="true" tabindex="-1"></a>        <span class="cf">with</span> torch.no_grad():</span>
-<span id="cb25-54"><a href="#cb25-54" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> X, y <span class="kw">in</span> valid_dl:</span>
-<span id="cb25-55"><a href="#cb25-55" aria-hidden="true" tabindex="-1"></a>                pred <span class="op">=</span> model(X)</span>
-<span id="cb25-56"><a href="#cb25-56" aria-hidden="true" tabindex="-1"></a>                valid_loss <span class="op">+=</span> criterion(pred, y).item() <span class="op">*</span> X.shape[<span class="dv">0</span>]</span>
-<span id="cb25-57"><a href="#cb25-57" aria-hidden="true" tabindex="-1"></a>                total <span class="op">+=</span> y.shape[<span class="dv">0</span>]</span>
-<span id="cb25-58"><a href="#cb25-58" aria-hidden="true" tabindex="-1"></a>                correct <span class="op">+=</span> (pred.argmax(dim<span class="op">=</span><span class="dv">1</span>) <span class="op">==</span> y).<span class="bu">sum</span>().item()</span>
-<span id="cb25-59"><a href="#cb25-59" aria-hidden="true" tabindex="-1"></a>        valid_loss <span class="op">/=</span> total</span>
-<span id="cb25-60"><a href="#cb25-60" aria-hidden="true" tabindex="-1"></a>        acc <span class="op">=</span> correct <span class="op">/</span> total</span>
-<span id="cb25-61"><a href="#cb25-61" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb25-62"><a href="#cb25-62" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> rank <span class="op">==</span> <span class="dv">0</span>:</span>
-<span id="cb25-63"><a href="#cb25-63" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"Epoch </span><span class="sc">{</span>epoch<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss">: Train Loss=</span><span class="sc">{</span>train_loss<span class="sc">:.4f}</span><span class="ss"> Valid Loss=</span><span class="sc">{</span>valid_loss<span class="sc">:.4f}</span><span class="ss"> Acc=</span><span class="sc">{</span>acc<span class="sc">:.3%}</span><span class="ss">"</span>)</span>
-<span id="cb25-64"><a href="#cb25-64" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb25-65"><a href="#cb25-65" aria-hidden="true" tabindex="-1"></a>        metrics <span class="op">=</span> {<span class="st">"epoch"</span>: epoch<span class="op">+</span><span class="dv">1</span>, <span class="st">"train_loss"</span>: train_loss, <span class="st">"valid_loss"</span>: valid_loss, <span class="st">"accuracy"</span>: acc}</span>
-<span id="cb25-66"><a href="#cb25-66" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Checkpoint every 5 epochs</span></span>
-<span id="cb25-67"><a href="#cb25-67" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> (epoch <span class="op">+</span> <span class="dv">1</span>) <span class="op">%</span> <span class="dv">5</span> <span class="op">==</span> <span class="dv">0</span>:</span>
-<span id="cb25-68"><a href="#cb25-68" aria-hidden="true" tabindex="-1"></a>            <span class="cf">with</span> tempfile.TemporaryDirectory() <span class="im">as</span> ckpt_dir:</span>
-<span id="cb25-69"><a href="#cb25-69" aria-hidden="true" tabindex="-1"></a>                torch.save(model.module.state_dict(), os.path.join(ckpt_dir, <span class="st">"model.pt"</span>))</span>
-<span id="cb25-70"><a href="#cb25-70" aria-hidden="true" tabindex="-1"></a>                ray.train.report(metrics, checkpoint<span class="op">=</span>ray.train.Checkpoint.from_directory(ckpt_dir))</span>
-<span id="cb25-71"><a href="#cb25-71" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
-<span id="cb25-72"><a href="#cb25-72" aria-hidden="true" tabindex="-1"></a>            ray.train.report(metrics)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Prepare DataLoaders for distributed training</span></span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a>    train_dl, valid_dl <span class="op">=</span> get_dataloaders(batch_size)</span>
+<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a>    train_dl <span class="op">=</span> ray.train.torch.prepare_data_loader(train_dl)</span>
+<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a>    valid_dl <span class="op">=</span> ray.train.torch.prepare_data_loader(valid_dl)</span>
+<span id="cb25-17"><a href="#cb25-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-18"><a href="#cb25-18" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Define the model</span></span>
+<span id="cb25-19"><a href="#cb25-19" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> VisionTransformer(</span>
+<span id="cb25-20"><a href="#cb25-20" aria-hidden="true" tabindex="-1"></a>        image_size<span class="op">=</span><span class="dv">32</span>, patch_size<span class="op">=</span><span class="dv">4</span>,</span>
+<span id="cb25-21"><a href="#cb25-21" aria-hidden="true" tabindex="-1"></a>        num_layers<span class="op">=</span><span class="dv">12</span>, num_heads<span class="op">=</span><span class="dv">8</span>, hidden_dim<span class="op">=</span><span class="dv">384</span>, mlp_dim<span class="op">=</span><span class="dv">768</span>, num_classes<span class="op">=</span><span class="dv">10</span>,</span>
+<span id="cb25-22"><a href="#cb25-22" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb25-23"><a href="#cb25-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-24"><a href="#cb25-24" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Prepare the model for FSDP</span></span>
+<span id="cb25-25"><a href="#cb25-25" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> ray.train.torch.prepare_model(model, parallel_strategy<span class="op">=</span><span class="st">"fsdp"</span>)</span>
+<span id="cb25-26"><a href="#cb25-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-27"><a href="#cb25-27" aria-hidden="true" tabindex="-1"></a>    criterion <span class="op">=</span> nn.CrossEntropyLoss()</span>
+<span id="cb25-28"><a href="#cb25-28" aria-hidden="true" tabindex="-1"></a>    optimizer <span class="op">=</span> torch.optim.AdamW(model.parameters(), lr<span class="op">=</span>lr, weight_decay<span class="op">=</span><span class="fl">1e-2</span>)</span>
+<span id="cb25-29"><a href="#cb25-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-30"><a href="#cb25-30" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> epoch <span class="kw">in</span> <span class="bu">range</span>(epochs):</span>
+<span id="cb25-31"><a href="#cb25-31" aria-hidden="true" tabindex="-1"></a>        model.train()</span>
+<span id="cb25-32"><a href="#cb25-32" aria-hidden="true" tabindex="-1"></a>        total_loss, sample_cnt <span class="op">=</span> <span class="fl">0.0</span>, <span class="dv">0</span></span>
+<span id="cb25-33"><a href="#cb25-33" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> X, y <span class="kw">in</span> train_dl:</span>
+<span id="cb25-34"><a href="#cb25-34" aria-hidden="true" tabindex="-1"></a>            pred <span class="op">=</span> model(X)</span>
+<span id="cb25-35"><a href="#cb25-35" aria-hidden="true" tabindex="-1"></a>            loss <span class="op">=</span> criterion(pred, y)</span>
+<span id="cb25-36"><a href="#cb25-36" aria-hidden="true" tabindex="-1"></a>            optimizer.zero_grad()</span>
+<span id="cb25-37"><a href="#cb25-37" aria-hidden="true" tabindex="-1"></a>            loss.backward()</span>
+<span id="cb25-38"><a href="#cb25-38" aria-hidden="true" tabindex="-1"></a>            optimizer.step()</span>
+<span id="cb25-39"><a href="#cb25-39" aria-hidden="true" tabindex="-1"></a>            total_loss <span class="op">+=</span> loss.item() <span class="op">*</span> X.shape[<span class="dv">0</span>]</span>
+<span id="cb25-40"><a href="#cb25-40" aria-hidden="true" tabindex="-1"></a>            sample_cnt <span class="op">+=</span> X.shape[<span class="dv">0</span>]</span>
+<span id="cb25-41"><a href="#cb25-41" aria-hidden="true" tabindex="-1"></a>        train_loss <span class="op">=</span> total_loss <span class="op">/</span> sample_cnt</span>
+<span id="cb25-42"><a href="#cb25-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-43"><a href="#cb25-43" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Validation loop</span></span>
+<span id="cb25-44"><a href="#cb25-44" aria-hidden="true" tabindex="-1"></a>        model.<span class="bu">eval</span>()</span>
+<span id="cb25-45"><a href="#cb25-45" aria-hidden="true" tabindex="-1"></a>        valid_loss, correct, total <span class="op">=</span> <span class="fl">0.0</span>, <span class="dv">0</span>, <span class="dv">0</span></span>
+<span id="cb25-46"><a href="#cb25-46" aria-hidden="true" tabindex="-1"></a>        <span class="cf">with</span> torch.no_grad():</span>
+<span id="cb25-47"><a href="#cb25-47" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> X, y <span class="kw">in</span> valid_dl:</span>
+<span id="cb25-48"><a href="#cb25-48" aria-hidden="true" tabindex="-1"></a>                pred <span class="op">=</span> model(X)</span>
+<span id="cb25-49"><a href="#cb25-49" aria-hidden="true" tabindex="-1"></a>                valid_loss <span class="op">+=</span> criterion(pred, y).item() <span class="op">*</span> X.shape[<span class="dv">0</span>]</span>
+<span id="cb25-50"><a href="#cb25-50" aria-hidden="true" tabindex="-1"></a>                total <span class="op">+=</span> y.shape[<span class="dv">0</span>]</span>
+<span id="cb25-51"><a href="#cb25-51" aria-hidden="true" tabindex="-1"></a>                correct <span class="op">+=</span> (pred.argmax(dim<span class="op">=</span><span class="dv">1</span>) <span class="op">==</span> y).<span class="bu">sum</span>().item()</span>
+<span id="cb25-52"><a href="#cb25-52" aria-hidden="true" tabindex="-1"></a>        valid_loss <span class="op">/=</span> total</span>
+<span id="cb25-53"><a href="#cb25-53" aria-hidden="true" tabindex="-1"></a>        acc <span class="op">=</span> correct <span class="op">/</span> total</span>
+<span id="cb25-54"><a href="#cb25-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-55"><a href="#cb25-55" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> rank <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb25-56"><a href="#cb25-56" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"Epoch </span><span class="sc">{</span>epoch<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss">: Train Loss=</span><span class="sc">{</span>train_loss<span class="sc">:.4f}</span><span class="ss"> Valid Loss=</span><span class="sc">{</span>valid_loss<span class="sc">:.4f}</span><span class="ss"> Acc=</span><span class="sc">{</span>acc<span class="sc">:.3%}</span><span class="ss">"</span>)</span>
+<span id="cb25-57"><a href="#cb25-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-58"><a href="#cb25-58" aria-hidden="true" tabindex="-1"></a>        metrics <span class="op">=</span> {<span class="st">"epoch"</span>: epoch<span class="op">+</span><span class="dv">1</span>, <span class="st">"train_loss"</span>: train_loss, <span class="st">"valid_loss"</span>: valid_loss, <span class="st">"accuracy"</span>: acc}</span>
+<span id="cb25-59"><a href="#cb25-59" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Checkpoint every 5 epochs</span></span>
+<span id="cb25-60"><a href="#cb25-60" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> (epoch <span class="op">+</span> <span class="dv">1</span>) <span class="op">%</span> <span class="dv">5</span> <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb25-61"><a href="#cb25-61" aria-hidden="true" tabindex="-1"></a>            <span class="cf">with</span> tempfile.TemporaryDirectory() <span class="im">as</span> ckpt_dir:</span>
+<span id="cb25-62"><a href="#cb25-62" aria-hidden="true" tabindex="-1"></a>                torch.save(model.module.state_dict(), os.path.join(ckpt_dir, <span class="st">"model.pt"</span>))</span>
+<span id="cb25-63"><a href="#cb25-63" aria-hidden="true" tabindex="-1"></a>                ray.train.report(metrics, checkpoint<span class="op">=</span>ray.train.Checkpoint.from_directory(ckpt_dir))</span>
+<span id="cb25-64"><a href="#cb25-64" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb25-65"><a href="#cb25-65" aria-hidden="true" tabindex="-1"></a>            ray.train.report(metrics)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</div>
+</div>
 <div class="callout callout-style-default callout-note callout-titled" title="Change the parallel strategy to DDP">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -2043,7 +2082,11 @@ Your browser does not support the video tag. </video> <br> <em>Distributed Train
 </section>
 <section id="configure-run-checkpointing-and-storage" class="level3">
 <h3 class="anchored" data-anchor-id="configure-run-checkpointing-and-storage">4. Configure Run Checkpointing and Storage</h3>
-<p>Use Ray’s checkpointing utilities to save the best results and recoverable states:</p>
+<p>We now use <strong>Ray’s</strong> checkpointing utilities to save the best results and recoverable states:</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-16-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-16-1" role="tab" aria-controls="tabset-16-1" aria-selected="true" href="">Configure Run Checkpointing and Storage</a></li></ul>
+<div class="tab-content">
+<div id="tabset-16-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-16-1-tab">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> ray.train <span class="im">import</span> RunConfig, CheckpointConfig</span>
 <span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>checkpoint_config <span class="op">=</span> CheckpointConfig(</span>
@@ -2056,10 +2099,17 @@ Your browser does not support the video tag. </video> <br> <em>Distributed Train
 <span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a>    storage_path<span class="op">=</span><span class="st">"/mnt/cluster_storage/training/"</span>,  <span class="co"># Use a persistent/shared location</span></span>
 <span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a>    checkpoint_config<span class="op">=</span>checkpoint_config,</span>
 <span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</div>
+</div>
 </section>
 <section id="launch-training-with-torchtrainer" class="level3">
 <h3 class="anchored" data-anchor-id="launch-training-with-torchtrainer">5. Launch Training with TorchTrainer</h3>
 <p>Bring all the configs together and kick off distributed training:</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-17-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-17-1" role="tab" aria-controls="tabset-17-1" aria-selected="true" href="">Launch Training with TorchTrainer</a></li></ul>
+<div class="tab-content">
+<div id="tabset-17-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-17-1-tab">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> ray.train.torch <span class="im">import</span> TorchTrainer</span>
 <span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>global_batch_size <span class="op">=</span> <span class="dv">1024</span></span>
@@ -2081,10 +2131,17 @@ Your browser does not support the video tag. </video> <br> <em>Distributed Train
 <span id="cb28-19"><a href="#cb28-19" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb28-20"><a href="#cb28-20" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Starting FSDP distributed training..."</span>)</span>
 <span id="cb28-21"><a href="#cb28-21" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> trainer.fit()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</div>
+</div>
 </section>
 <section id="load-and-use-checkpoints" class="level3">
 <h3 class="anchored" data-anchor-id="load-and-use-checkpoints">6. Load and Use Checkpoints</h3>
-<p>Our model can be restored from the best checkpoint after training:</p>
+<p>Once the training is complete, the model can be restored from the best checkpoint:</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-18-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-18-1" role="tab" aria-controls="tabset-18-1" aria-selected="true" href="">Load and Use Checkpoints</a></li></ul>
+<div class="tab-content">
+<div id="tabset-18-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-18-1-tab">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
 <span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> torchvision.models <span class="im">import</span> VisionTransformer</span>
 <span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
@@ -2098,11 +2155,14 @@ Your browser does not support the video tag. </video> <br> <em>Distributed Train
 <span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>    )</span>
 <span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>    state_dict <span class="op">=</span> torch.load(model_path, map_location<span class="op">=</span><span class="st">"cpu"</span>)</span>
 <span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a>    model.load_state_dict(state_dict)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Here is the complete code for the training script:</p>
+</div>
+</div>
+</div>
+<p>Let’s now put all the pieces together and train the model on the cluster.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-11-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-11-1" role="tab" aria-controls="tabset-11-1" aria-selected="true" href="">train_fsdp.py</a></li></ul>
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-19-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-19-1" role="tab" aria-controls="tabset-19-1" aria-selected="true" href="">train_fsdp.py</a></li></ul>
 <div class="tab-content">
-<div id="tabset-11-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-11-1-tab">
+<div id="tabset-19-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-19-1-tab">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
 <span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> tempfile</span>
 <span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
@@ -2217,19 +2277,37 @@ Your browser does not support the video tag. </video> <br> <em>Distributed Train
 </section>
 <section id="conclusion" class="level2">
 <h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
-<p>Distributed training from scratch can be daunting, but modern frameworks like Ray Train, combined with PyTorch features such as Fully Sharded Data Parallel (FSDP), make scalable and efficient training approachable and practical. We demonstrated how to set up a distributed pipeline for finetuning a model on multiple GPUs using Ray Train and PyTorch FSDP.</p>
-<p>Leveraging Ray’s abstractions, you can efficiently utilize your compute resources, monitor experiments, and scale training seamlessly. If you need to push scalability further, techniques such as Pipeline Parallelism, Tensor Parallelism, and Sequence Parallelism can be explored, each offering unique benefits for even larger model and data workloads.</p>
+<p>Distributed training from scratch is often perceived as a complex and challenging endeavor, especially when it comes to configuring multiple GPUs and orchestrating communication between workers. However, modern open-source frameworks such as <strong>Ray Train</strong>, together with robust PyTorch features like <strong>FSDP</strong>, have significantly lowered the barrier to scalable, efficient distributed deep learning. In this blog, we walked through a step-by-step workflow for setting up a distributed training pipeline to fine-tune a model on multiple GPUs, leveraging Ray Train for orchestration and PyTorch FSDP for efficient memory and communication management.</p>
+<p>By utilizing <strong>Ray’s</strong> high-level abstractions, we are able to streamline the engineering process, eliminate much of the boilerplate involved in custom distributed training, and gain access to valuable capabilities such as experiment tracking, fault tolerance, and automatic checkpointing. <strong>Ray’s</strong> scaling configurations allow us to harness all available compute resources, whether just a few or dozens of GPUs, while its dashboard provides clear visibility into resource utilization and training progress in real-time.</p>
+<p>In this blog, we mostly talk about <code>Data Parallelism (DP)</code> technique for scaling training to multiple GPUs. But for tackling even more demanding tasks with extremely large models and datasets, there are additional and more advanced techniques available. Strategies such as <code>Pipeline Parallelism</code>, <code>Tensor Parallelism</code>, and <code>Sequence Parallelism</code> have become key components in scaling deep learning to the frontier level. These methods allow models to be split across layers, parameters, or computation steps, enabling efficient training across clusters of GPUs.</p>
+<p>Emerging practices in hybrid sharding, mixed precision, model offloading, and asynchronous optimization further push the boundaries of what is possible, empowering researchers and engineers to experiment at ever-increasing scales while managing resource and memory efficiency. Maybe in some future blog, we will discuss these advanced techniques in more detail (as I learn them :)).</p>
 </section>
 <section id="references-further-resources" class="level2">
 <h2 class="anchored" data-anchor-id="references-further-resources">References &amp; Further Resources</h2>
 <ul>
-<li><a href="https://docs.ray.io/en/latest/train/index.html">Ray Train Documentation</a></li>
-<li><a href="https://pytorch.org/docs/stable/fsdp.html">PyTorch Distributed FSDP</a></li>
-<li><a href="https://docs.ray.io/en/latest/ray-air/getting-started.html">Ray AIR: Scalable ML on Ray</a></li>
-<li><a href="https://docs.ray.io/en/latest/train/dl_guide.html">Train Deep Learning Models with Ray</a></li>
-<li><a href="https://pytorch.org/tutorials/beginner/dist_overview.html">PyTorch Distributed Overview</a></li>
-<li><a href="https://www.deepspeed.ai/">DeepSpeed: High-Performance Deep Learning Optimization Library</a></li>
-<li><a href="https://docs.ray.io/en/latest/data/index.html">Ray Data for Large-Scale Data Ingestion &amp; Preprocessing</a></li>
+<li>Anyscale and Ray
+<ul>
+<li><a href="https://console.anyscale.com/register/v2">Getting Started with Ray on Anyscale</a></li>
+</ul></li>
+<li>Distributed Training
+<ul>
+<li><a href="https://lcs2.in/llm2501">Advanced Large Language Models [IIT Delhi]</a></li>
+<li><a href="https://hanlab.mit.edu/courses/2024-fall-65940">TinyML and Efficient Deep Learning Computing [MIT]</a></li>
+<li><a href="https://huggingface.co/spaces/nanotron/ultrascale-playbook?section=high-level_overview">Training LLMs on GPU Clusters</a></li>
+<li><a href="https://www.youtube.com/watch?v=9MvD-XsowsE&amp;t=1068s">CS231N Lecture 11, Large Scale Distributed Training</a></li>
+</ul></li>
+<li>LLM and Advance Deep Learning
+<ul>
+<li><a href="https://theschoolof.ai/">The School of AI</a></li>
+<li><a href="https://udlbook.github.io/udlbook/">Understanding Deep Learning</a></li>
+<li><a href="https://www.youtube.com/playlist?list=PLPTV0NXA_ZSgsLAr8YCgCwhPIJNNtexWu">Building LLMs from scratch</a></li>
+</ul></li>
+<li>Ray and PyTorch
+<ul>
+<li><a href="https://docs.ray.io/en/latest/train/train.html">Ray Train Documentation</a></li>
+<li><a href="https://docs.pytorch.org/docs/stable/distributed.fsdp.fully_shard.html">PyTorch FSDP2 Documentation</a></li>
+<li><a href="https://docs.ray.io/en/latest/train/user-guides/data-loading-preprocessing.html">Ray Data Documentation</a></li>
+</ul></li>
 </ul>
 
 
