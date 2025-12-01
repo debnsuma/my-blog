@@ -236,7 +236,7 @@ window.Quarto = {
   <li><a href="#dynamic-memory" id="toc-dynamic-memory" class="nav-link" data-scroll-target="#dynamic-memory">Dynamic Memory</a></li>
   </ul></li>
   <li><a href="#batch-size-intuition" id="toc-batch-size-intuition" class="nav-link" data-scroll-target="#batch-size-intuition">Batch Size Intuition</a></li>
-  <li><a href="#memory-usage-in-transformer" id="toc-memory-usage-in-transformer" class="nav-link" data-scroll-target="#memory-usage-in-transformer">Memory usage in Transformer</a>
+  <li><a href="#memory-usage-in-transformers" id="toc-memory-usage-in-transformers" class="nav-link" data-scroll-target="#memory-usage-in-transformers">Memory Usage in Transformers</a>
   <ul class="collapse">
   <li><a href="#solution-1-activation-recomputation" id="toc-solution-1-activation-recomputation" class="nav-link" data-scroll-target="#solution-1-activation-recomputation">Solution 1: Activation Recomputation</a></li>
   <li><a href="#solution-2-gradient-accumulation" id="toc-solution-2-gradient-accumulation" class="nav-link" data-scroll-target="#solution-2-gradient-accumulation">Solution 2: Gradient Accumulation</a></li>
@@ -250,13 +250,13 @@ window.Quarto = {
   <li><a href="#the-limitations-of-simple-data-parallelism-dp" id="toc-the-limitations-of-simple-data-parallelism-dp" class="nav-link" data-scroll-target="#the-limitations-of-simple-data-parallelism-dp">The Limitations of Simple Data Parallelism (DP)</a></li>
   <li><a href="#zero-zero-redundancy-optimizer" id="toc-zero-zero-redundancy-optimizer" class="nav-link" data-scroll-target="#zero-zero-redundancy-optimizer">ZeRO: Zero Redundancy Optimizer</a>
   <ul class="collapse">
-  <li><a href="#zero-1-sharding-optimizer-states" id="toc-zero-1-sharding-optimizer-states" class="nav-link" data-scroll-target="#zero-1-sharding-optimizer-states">ZeRO-1: Sharding Optimizer States</a></li>
-  <li><a href="#zero-2-sharding-gradients" id="toc-zero-2-sharding-gradients" class="nav-link" data-scroll-target="#zero-2-sharding-gradients">ZeRO-2: Sharding Gradients</a></li>
-  <li><a href="#zero-3-sharding-parameters" id="toc-zero-3-sharding-parameters" class="nav-link" data-scroll-target="#zero-3-sharding-parameters">ZeRO-3: Sharding Parameters</a></li>
+  <li><a href="#zero-1-sharding-optimizer-states" id="toc-zero-1-sharding-optimizer-states" class="nav-link" data-scroll-target="#zero-1-sharding-optimizer-states">ZeRO-1: Sharding <code>Optimizer States</code></a></li>
+  <li><a href="#zero-2-sharding-gradients" id="toc-zero-2-sharding-gradients" class="nav-link" data-scroll-target="#zero-2-sharding-gradients">ZeRO-2: Sharding <code>Gradients</code></a></li>
+  <li><a href="#zero-3-sharding-parameters" id="toc-zero-3-sharding-parameters" class="nav-link" data-scroll-target="#zero-3-sharding-parameters">ZeRO-3: Sharding <code>Parameters</code></a></li>
   </ul></li>
-  <li><a href="#introduction-to-ray---a-unified-ai-compute-engine" id="toc-introduction-to-ray---a-unified-ai-compute-engine" class="nav-link" data-scroll-target="#introduction-to-ray---a-unified-ai-compute-engine">Introduction to Ray - A Unified AI Compute Engine</a>
+  <li><a href="#introduction-to-ray---unified-ai-compute-engine" id="toc-introduction-to-ray---unified-ai-compute-engine" class="nav-link" data-scroll-target="#introduction-to-ray---unified-ai-compute-engine">Introduction to Ray - <code>Unified AI Compute Engine</code></a>
   <ul class="collapse">
-  <li><a href="#ray-core-primitives" id="toc-ray-core-primitives" class="nav-link" data-scroll-target="#ray-core-primitives"><code>Ray Core</code> Primitives</a></li>
+  <li><a href="#ray-core-primitives" id="toc-ray-core-primitives" class="nav-link" data-scroll-target="#ray-core-primitives">Ray Core Primitives</a></li>
   <li><a href="#an-example-for-stateless-tasks-tasks" id="toc-an-example-for-stateless-tasks-tasks" class="nav-link" data-scroll-target="#an-example-for-stateless-tasks-tasks">An example: For <code>Stateless</code> Tasks (Tasks)</a></li>
   <li><a href="#going-further-for-stateful-tasks-actors" id="toc-going-further-for-stateful-tasks-actors" class="nav-link" data-scroll-target="#going-further-for-stateful-tasks-actors">Going Further: For <code>Stateful</code> Tasks (Actors)</a></li>
   <li><a href="#ray-for-different-ai-workloads" id="toc-ray-for-different-ai-workloads" class="nav-link" data-scroll-target="#ray-for-different-ai-workloads">Ray for Different AI Workloads</a></li>
@@ -299,17 +299,17 @@ window.Quarto = {
 
 <section id="introduction" class="level2">
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
-<p>Deep learning models are becoming massive, and so are the challenges of training them. I am quite new to distributed training, and at present I am trying to learn how to scale the training to multiple GPUs and multiple machines using different forms of parallelism.</p>
-<p>And in the process, I found that more than the training or the algorithm itself, it is about understanding how distributed systems work and how to manage resources (GPUs and CPUs) efficiently.</p>
+<p>Deep learning models are growing larger and more complex by the day and so are the challenges in training them. I’m actually quite new to distributed training myself, currently trying to figure out how to scale training across multiple GPUs and even multiple machines using different forms of parallelism.</p>
+<p>What I’ve quickly discovered is that the bigger challenge isn’t the training algorithm itself, but understanding how distributed systems work and how to manage resources (GPUs and CPUs) efficiently!</p>
 <p align="center">
 <img src="assets/model_params.png" alt="Model Parameters vs Training Time" width="100%">
 </p>
-<p>As models grow in size and complexity, the time required to train them is skyrocketing, sometimes taking days, weeks, or even months for a single epoch on one GPU.</p>
+<p>As models get larger, the time to train explodes, sometimes taking days, weeks, or even months just for a single epoch on one GPU.</p>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 24%">
-<col style="width: 34%">
-<col style="width: 41%">
+<col style="width: 23%">
+<col style="width: 30%">
+<col style="width: 45%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -346,10 +346,10 @@ window.Quarto = {
 </tr>
 </tbody>
 </table>
-<p>If we look at this table, we can see the dramatic growth in model parameter counts and the corresponding jump in training time requirements:</p>
+<p>Looking at this table, you can see a dramatic surge in both parameter counts and training times:</p>
 <ul>
-<li><strong>ResNet-50 and ResNet-101</strong> are manageable on a single GPU, but BERT-Base is already pushing the envelope.</li>
-<li><strong>Turing-NLG 17B</strong> and especially <strong>GPT-3 175B</strong> are in a completely different league, requiring immense computing power and time.</li>
+<li><strong>ResNet-50</strong> and <strong>ResNet-101</strong> are manageable with a single GPU, but BERT-Base is already pushing the limits.</li>
+<li><strong>Turing-NLG 17B</strong> and especially <strong>GPT-3 175B</strong> enter a whole new league, demanding immense computing power and time.</li>
 </ul>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
@@ -364,19 +364,19 @@ Note
 <p>If we tried to train GPT-3 on a single GPU, it would take roughly <strong>355 years</strong> to finish. Distributed training is not just useful, it’s absolutely essential as model sizes and training time requirements soar</p>
 </div>
 </div>
-<p>But why is this happening? Let’s set the stage with some striking observations:</p>
+<p>But why does this happen?</p>
 <ul>
 <li>Model sizes and GPU demand are exploding.</li>
-<li>Training hours required can reach into the millions for cutting-edge models.</li>
+<li>Training these models can require millions of GPU hours.</li>
 </ul>
-<p>Consider the <code>LLaMA</code> family of models. The graph below shows that as you scale up model size (circle diameter), performance increases but so does the training time. Look at the y-axis: we’re talking <em>millions</em> of GPU hours! Training even one of these models on a single GPU isn’t just slow, it’s practically impossible.</p>
+<p>Take the <code>LLaMA</code> family of models as an example. The graph below illustrates that as you increase model size (shown by circle diameter), you get better performance, but you’ll need even more training time. Look at the y-axis: we’re talking <em>millions</em> of GPU hours! Training any of these giants on a single GPU is not just slow, it’s practically impossible.</p>
 <p align="center">
 <img src="assets/model-size-vs-performance.png" alt="Model Size vs Performance" width="70%">
 </p>
-<p>In this blog post, we’ll try to understand distributed training from first principles and how to scale the training to multiple GPUs and multiple machines using different forms of parallelism. We will also look at how to implement these techniques from scratch using <code>PyTorch</code> and later on we will use <code>Ray</code> to scale the training.</p>
-<p>As I mentioned earlier, I am quite new to distributed training, and at present I’m still in <code>epoch</code> 1 of my journey :).</p>
-<p>Before I get started I would like to thank few of the brilliant researchers, professors, like <strong>Prof Tanmoy Chakraborty</strong>, <strong>Dr Yatin Nandwani</strong> and <strong>Prof.&nbsp;Song Han</strong>. My mentor/teacher <strong>Rohan Shravan</strong>, for his exceptional teaching, guidance and coaching over the years. And also to few of my colleagues and friends like <strong>Dipankar Ranjan Baisya</strong>, <strong>Chris Fregly</strong>, <strong>Zachary Mueller</strong>, <strong>Ram Mohan</strong>, <strong>Debanjan Saha</strong> and <strong>Siddhant Gupta</strong> who have made this journey possible for me.</p>
-<p>Most of the content in this blog post is based on the work and lectures of these brilliant researchers, professors, and my mentors/teachers. You can find all the references and further resources at the end of the blog post.</p>
+<p>In this blog post, we’ll explore distributed training from the ground up—learning how to scale deep learning to multiple GPUs and machines with various parallelism techniques. We’ll see how to implement these strategies from scratch using <code>PyTorch</code>, then level up by using <code>Ray</code> for scalable training.</p>
+<p>As I mentioned, I’m still in <code>epoch</code> 1 of my distributed training journey! And as I learn more shall keep updating this writeup.</p>
+<p>Before I dive in, I’d like to thank some of the brilliant minds, mentors, and friends who’ve helped me along the way: <strong>Prof.&nbsp;Tanmoy Chakraborty</strong>, <strong>Dr.&nbsp;Yatin Nandwani</strong>, <strong>Prof.&nbsp;Song Han</strong>, my mentor <strong>Rohan Shravan</strong> (for his exceptional teaching and guidance over the years), and friends/colleagues like <strong>Dipankar Ranjan Baisya</strong>, <strong>Chris Fregly</strong>, <strong>Zachary Mueller</strong>, <strong>Ram Mohan</strong>, <strong>Debanjan Saha</strong>, and <strong>Siddhant Gupta</strong>.</p>
+<p>Most of the content here is inspired by their work, lectures, and advice. All references and resources are at the end of this post.</p>
 </section>
 <section id="deep-learning-training-basics" class="level2">
 <h2 class="anchored" data-anchor-id="deep-learning-training-basics">Deep Learning Training Basics</h2>
@@ -411,78 +411,78 @@ Note
 </div>
 </div>
 </div>
-<p>In a typical training loop, after defining the model, the optimizer, the loss function, and the data loader, the training loop trains the model by performing the following steps for each epoch:</p>
+<p>What’s happening in each epoch of this training loop?</p>
 <ol type="1">
-<li>Iterate over the data in mini-batches (<code>line 6-8</code>).</li>
-<li>Move each batch of data to the GPU (<code>line 9-10</code>).</li>
-<li>Zero out any previous gradients (<code>line 12-13</code>).</li>
-<li>Perform a forward pass to calculate the model outputs and loss (<code>line 15-17</code>).</li>
-<li>Compute gradients through backpropagation (<code>line 18-19</code>).</li>
-<li>Update the model parameters using the optimizer (<code>line 20-21</code>).</li>
+<li>We iterate over the data in mini-batches (<code>line 6-8</code>).</li>
+<li>Move each batch to the GPU (<code>line 9-10</code>).</li>
+<li>Zero out the gradients (<code>line 12-13</code>).</li>
+<li>Run the forward pass and compute loss (<code>line 15-17</code>).</li>
+<li>Perform backpropagation to compute gradients (<code>line 18-19</code>).</li>
+<li>Update the model with the optimizer (<code>line 20-21</code>).</li>
 </ol>
 <p align="center">
 <img src="assets/single-gpu.png" alt="Single GPU Training Loop" width="70%">
 </p>
-<p>This pattern is the core of most deep learning training routines.</p>
+<p>This pattern is the core of most deep learning training loop (in fact, it is the core of any machine learning training routine).</p>
 </section>
 <section id="bottlenecks-in-single-gpu-training" class="level2">
 <h2 class="anchored" data-anchor-id="bottlenecks-in-single-gpu-training">Bottlenecks in Single-GPU Training</h2>
-<p>When training deep learning models on a single GPU, high-bandwidth memory (HBM) is utilized by four main types of data:</p>
+<p>When training deep learning models on a single GPU, there are four main things that eat up high-bandwidth memory (HBM):</p>
 <ol type="1">
-<li><p><strong>Model Parameters</strong> (<span class="math inline">\(\Phi\)</span>):<br>
-The weights being learned during training.</p></li>
-<li><p><strong>Parameter Gradients</strong> (<span class="math inline">\(\nabla \Phi\)</span>):<br>
-The gradients computed during backpropagation, required for parameter updates.</p></li>
-<li><p><strong>Optimizer States</strong> (<span class="math inline">\(\Phi_{\text{optim}}\)</span>):<br>
-Auxiliary variables needed by the optimization algorithm, such as momentum and variance estimates (e.g., in Adam).</p></li>
-<li><p><strong>Activations</strong> (<span class="math inline">\(\mathcal{M}_{\text{act}}\)</span>):<br>
-The intermediate outputs from each neural network layer required to compute gradients during the backward pass.</p></li>
+<li><strong>Model Parameters</strong> (<span class="math inline">\(\Phi\)</span>):<br>
+These are the weights your model is learning.</li>
+<li><strong>Parameter Gradients</strong> (<span class="math inline">\(\nabla \Phi\)</span>):<br>
+The gradients calculated during backpropagation, which are used to update parameters.</li>
+<li><strong>Optimizer States</strong> (<span class="math inline">\(\Phi_{\text{optim}}\)</span>):<br>
+Extra variables required by the optimizer, such as momentum and variance in <code>Adam</code>.</li>
+<li><strong>Activations</strong> (<span class="math inline">\(\mathcal{M}_{\text{act}}\)</span>):<br>
+The intermediate outputs of each layer, which are necessary for gradient computation during backprop.</li>
 </ol>
-<p>Of these, the first three (<strong>Parameters</strong>, <strong>Gradients</strong>, and <strong>Optimizer States</strong>) are considered <strong>static components</strong>. They collectively define the minimum “static” memory footprint determined by the model architecture itself.</p>
-<p>The fourth component, <strong>Activations</strong>, is <strong>dynamic</strong> and its memory footprint depends on the input size (such as batch size and sequence length). Thus, activations often become the main bottleneck in large-scale training.</p>
+<p>The first three (<strong>parameters</strong>, <strong>gradients</strong>, and <strong>optimizer states</strong>) are <strong>static</strong>, they make up the fixed memory footprint determined by the model’s architecture.</p>
+<p>The activations are <strong>dynamic</strong>, depending on your batch and sequence length, and often become the main bottleneck for large-scale training.</p>
 <section id="static-memory" class="level3">
 <h3 class="anchored" data-anchor-id="static-memory">Static Memory</h3>
-<p>And when we are training if you look at the training loop again, until step <code>optimizer.step()</code>, we need to keep everything in the memory. And after <code>optimizer.step()</code>, we can discard the activations and the gradients. And we can keep the model parameters and the optimizer states in the memory.</p>
-<p>If <span class="math inline">\(\Psi\)</span> is the total number of parameters in the model, the total static memory required (<span class="math inline">\(\mathcal{M}_{static}\)</span>) using the Adam optimizer is a fixed amount: <strong><span class="math inline">\(16\Psi\)</span> bytes</strong>.</p>
+<p>If you revisit the training loop, you’ll notice that up until <code>optimizer.step()</code>, everything must be retained in memory. After that, you can discard activations and gradients, but the model parameters and optimizer states stick around.</p>
+<p>If <span class="math inline">\(\Psi\)</span> is the total number of model parameters, the static memory required (<span class="math inline">\(\mathcal{M}_{static}\)</span>) using the Adam optimizer is a crisp: <strong><span class="math inline">\(16\Psi\)</span> bytes</strong>.</p>
 <table class="caption-top table">
 <colgroup>
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
+<col style="width: 24%">
+<col style="width: 18%">
+<col style="width: 20%">
+<col style="width: 37%">
 </colgroup>
 <thead>
 <tr class="header">
-<th style="text-align: left;">Component</th>
-<th style="text-align: left;">Precision</th>
-<th style="text-align: left;">Size (<span class="math inline">\(\Psi\)</span> Bytes)</th>
-<th style="text-align: left;">Rationale</th>
+<th>Component</th>
+<th>Precision</th>
+<th style="text-align: center;">Size (<span class="math inline">\(\Psi\)</span> Bytes)</th>
+<th style="text-align: left;">Details</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left;">Model Parameters</td>
-<td style="text-align: left;">BF32 (4 bytes)</td>
-<td style="text-align: left;"><span class="math inline">\(4\Psi\)</span></td>
-<td style="text-align: left;">Used for forward and backward passes</td>
+<td>Model Parameters</td>
+<td>BF32 (4 bytes)</td>
+<td style="text-align: center;"><span class="math inline">\(4\Psi\)</span></td>
+<td style="text-align: left;">Used for fwd/back passes</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">Parameter Gradients</td>
-<td style="text-align: left;">BF32 (4 bytes)</td>
-<td style="text-align: left;"><span class="math inline">\(4\Psi\)</span></td>
-<td style="text-align: left;">Used in backpropagation</td>
+<td>Parameter Gradients</td>
+<td>BF32 (4 bytes)</td>
+<td style="text-align: center;"><span class="math inline">\(4\Psi\)</span></td>
+<td style="text-align: left;">For backpropagation</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;">Optimizer States (Adam)</td>
-<td style="text-align: left;">FP32 (4+4 bytes)</td>
-<td style="text-align: left;"><span class="math inline">\(8\Psi\)</span></td>
-<td style="text-align: left;">Stores 1st and 2nd moment estimates (<span class="math inline">\(4\Psi\)</span> each)</td>
+<td>Optimizer States (Adam)</td>
+<td>FP32 (4+4 bytes)</td>
+<td style="text-align: center;"><span class="math inline">\(8\Psi\)</span></td>
+<td style="text-align: left;">1st and 2nd moment estimates</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;"><strong>Total Static Memory</strong></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"><strong><span class="math inline">\(16\Psi\)</span></strong></td>
-<td style="text-align: left;"><strong>The absolute floor for static storage</strong></td>
+<td><strong>Total Static Memory</strong></td>
+<td></td>
+<td style="text-align: center;"><strong><span class="math inline">\(16\Psi\)</span></strong></td>
+<td style="text-align: left;"><strong>Absolute minimum for static storage</strong></td>
 </tr>
 </tbody>
 </table>
@@ -499,7 +499,7 @@ The intermediate outputs from each neural network layer required to compute grad
 <p>Adam maintains two additional FP32 (4-byte) tensors per parameter: the <strong>first moment</strong> (mean of gradients, <span class="math inline">\(m\)</span>) and the <strong>second moment</strong> (uncentered variance, <span class="math inline">\(v\)</span>). Thus, for each parameter, Adam stores <span class="math inline">\(4\)</span> bytes for <span class="math inline">\(m\)</span> and <span class="math inline">\(4\)</span> bytes for <span class="math inline">\(v\)</span>, totaling <span class="math inline">\(8\Psi\)</span> bytes.</p>
 </div>
 </div>
-<p>And when it comes to training a model, its all about how smartly we can manage this memory footprint. In modern LLM training, <strong>mixed precision</strong> is employed, typically using BF16 (2 bytes) for fast computation while maintaining a full-precision FP32 (4 bytes) copy of weights and optimizer states for numerical stability.</p>
+<p>When optimizing large models, memory management becomes an art. Modern LLM training uses <strong>mixed precision</strong>—typically BF16 (2 bytes) for fast compute, but still maintaining an FP32 (4 bytes) copy for weights and optimizer states to preserve accuracy.</p>
 <div class="callout callout-style-default callout-tip callout-titled" title="Mixed Precision Training">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -510,74 +510,73 @@ The intermediate outputs from each neural network layer required to compute grad
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong>Mixed Precision Training</strong> accelerates deep learning and reduces memory use by combining 16-bit (BF16/FP16) and 32-bit (FP32) floating-point operations.</p>
+<p><strong>Mixed Precision Training</strong> accelerates deep learning and reduces memory usage by combining 16-bit (BF16/FP16) and 32-bit (FP32) floating-point operations.</p>
 <ul>
-<li><em>How it works</em>: Forward and backward passes use low-precision (e.g., BF16) for parameters and activations, while a full-precision FP32 <code>master</code> copy of weights and optimizer states is kept for numerical stability.</li>
-<li><em>Why it matters</em>: Enables training of larger models or larger batches within the same hardware footprint. Mixed precision is now standard in large-scale model training.</li>
+<li><em>How?</em> Forward/backward passes run with low-precision types (BF16), while an FP32 <code>master</code> copy is kept for stability.</li>
+<li><em>Why care?</em> Allows larger models/batches to fit in memory and speeds up training. Mixed precision is now standard for large-scale model training.</li>
 </ul>
 </div>
 </div>
-<p>So, with mixed precision, the breakdown is as follows:</p>
+<p>With mixed precision, the memory usage looks like this:</p>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
+<col style="width: 17%">
+<col style="width: 20%">
+<col style="width: 37%">
 </colgroup>
 <thead>
 <tr class="header">
-<th style="text-align: left;">Component</th>
-<th style="text-align: left;">Precision</th>
-<th style="text-align: left;">Size (<span class="math inline">\(\Psi\)</span> Bytes)</th>
-<th style="text-align: left;">Rationale</th>
+<th>Component</th>
+<th>Precision</th>
+<th style="text-align: center;">Size (<span class="math inline">\(\Psi\)</span> Bytes)</th>
+<th style="text-align: left;">Details</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left;">Model Parameters</td>
-<td style="text-align: left;">BF16 (2 bytes)</td>
-<td style="text-align: left;"><span class="math inline">\(2\Psi\)</span></td>
-<td style="text-align: left;">Used for forward and backward passes</td>
+<td>Model Parameters</td>
+<td>BF16 (2 bytes)</td>
+<td style="text-align: center;"><span class="math inline">\(2\Psi\)</span></td>
+<td style="text-align: left;">For forward/backward passes</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">Parameter Gradients</td>
-<td style="text-align: left;">BF16 (2 bytes)</td>
-<td style="text-align: left;"><span class="math inline">\(2\Psi\)</span></td>
-<td style="text-align: left;">Used in backpropagation</td>
+<td>Parameter Gradients</td>
+<td>BF16 (2 bytes)</td>
+<td style="text-align: center;"><span class="math inline">\(2\Psi\)</span></td>
+<td style="text-align: left;">Backpropagation</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;">Master Weights</td>
-<td style="text-align: left;">FP32 (4 bytes)</td>
-<td style="text-align: left;"><span class="math inline">\(4\Psi\)</span></td>
-<td style="text-align: left;">Full precision copy for the update step</td>
+<td>Master Weights</td>
+<td>FP32 (4 bytes)</td>
+<td style="text-align: center;"><span class="math inline">\(4\Psi\)</span></td>
+<td style="text-align: left;">For weight updates</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">Optimizer States (Adam)</td>
-<td style="text-align: left;">FP32 (4+4 bytes)</td>
-<td style="text-align: left;"><span class="math inline">\(8\Psi\)</span></td>
-<td style="text-align: left;">Stores 1st and 2nd moment estimates (<span class="math inline">\(4\Psi\)</span> each)</td>
+<td>Optimizer States (Adam)</td>
+<td>FP32 (4+4 bytes)</td>
+<td style="text-align: center;"><span class="math inline">\(8\Psi\)</span></td>
+<td style="text-align: left;">1st/2nd moment estimates</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;"><strong>Total Static Memory (with Mixed Precision)</strong></td>
-<td style="text-align: left;"></td>
-<td style="text-align: left;"><strong><span class="math inline">\(16\Psi\)</span></strong></td>
-<td style="text-align: left;"><strong>The absolute floor for static storage</strong></td>
+<td><strong>Total Static Memory</strong></td>
+<td></td>
+<td style="text-align: center;"><strong><span class="math inline">\(16\Psi\)</span></strong></td>
+<td style="text-align: left;"><strong>Unchanged overall</strong></td>
 </tr>
 </tbody>
 </table>
 <p>You might notice that the total static memory remains <strong><span class="math inline">\(16\Psi\)</span></strong> bytes. So what is the advantage of mixed precision training?</p>
-<p>The key benefits of mixed precision are:</p>
 <ul>
-<li><strong>Increased Training Speed:</strong> As we are using lower-precision data types (like BF16) during forward and backward passes, computation is faster and less memory bandwidth is used.</li>
-<li><strong>Reduced Activation Memory:</strong> Since our model parameters and optimizer states are stored in FP32, the activations, which are stored in BF16 during training, require half the memory compared to FP32, so the dynamic (activation) memory footprint is significantly lower.</li>
+<li><strong>Faster Training:</strong> Using BF16 reduces computation time and memory bandwidth.</li>
+<li><strong>Activations Use Half the Memory:</strong> Activations (stored in BF16) become much lighter.</li>
 </ul>
-<p>While the absolute static memory is unchanged, mixed precision allows for faster training and greater memory efficiency, especially for storing activations, enabling larger models or batches to fit within the same hardware limits.</p>
-<p>And this calculation reveals a significant challenge: a <strong>70 Billion parameter model</strong> requires approximately <span class="math inline">\(70\text{B} \times 16 \text{ bytes} \approx 1120 \text{ GB}\)</span> of static memory. With high-end GPUs typically offering only <span class="math inline">\(80 \text{ GB}\)</span> of memory, loading even the static state of the model becomes impossible, without considering the dynamic activations.</p>
+<p>Even though the static footprint isn’t reduced, training can run <em>faster</em>, and we can fit larger dynamic activations, squeezing the most out of every GPU.</p>
+<p>But here’s the hard truth: a <strong>70B parameter model</strong> eats up around <span class="math inline">\(70\text{B} \times 16\text{ bytes} = 1120\text{ GB}\)</span> of static memory, which is far beyond a single A100 GPU’s 80GB. And that’s before counting activations!</p>
 </section>
 <section id="dynamic-memory" class="level3">
 <h3 class="anchored" data-anchor-id="dynamic-memory">Dynamic Memory</h3>
-<p>This component is dependent on the input batch and is the primary cause of memory bottlenecks.</p>
+<p>Dynamic memory, mainly activations, is completely input-dependent and usually the cause of memory headaches.</p>
 <ul>
 <li><p><strong>Activations:</strong> The output of each layer. They must be stored until the <strong>backward pass</strong> to compute the gradients.</p>
 <ul>
@@ -597,17 +596,17 @@ The intermediate outputs from each neural network layer required to compute grad
 <p align="center">
 <img src="assets/activations.png" alt="Activation Count" width="70%">
 </p>
-<p>As we can see, activation memory usage is <strong>not static</strong> for a given model; it scales:</p>
+<p>As we can see, activation memory usage is <strong>not static</strong> for a given model, it:</p>
 <ul>
-<li><strong>Linearly</strong> with the <strong>batch size</strong> (<span class="math inline">\(\text{bs}\)</span>)</li>
-<li><strong>Quadratically</strong> with the <strong>sequence length</strong> (<span class="math inline">\(\text{seq}\)</span>)</li>
+<li>Grows <code>linearly</code> with batch size (<span class="math inline">\(bs\)</span>)</li>
+<li>Grows <code>quadratically</code> with sequence length (<span class="math inline">\(seq\)</span>)</li>
 </ul>
-<p>And this quadratic scaling with <span class="math inline">\(\text{seq}^2\)</span> (an effect stemming from the attention matrix) means the activation memory is the part that will <strong>blow up</strong> when you increase the batch size or train with longer sequences.</p>
+<p>This quadratic growth (thanks, attention matrix!) is why activation memory swells out of control when you increase batch size or sequence length.</p>
 </section>
 </section>
 <section id="batch-size-intuition" class="level2">
 <h2 class="anchored" data-anchor-id="batch-size-intuition">Batch Size Intuition</h2>
-<p>So, as we can see that the longer the sequence, the more activations we need and hence the more memory we need. So, even for one single sequence, the memory required is more than 50 GB. And this is a significant challenge for training large models.</p>
+<p>As you might guess, longer sequences mean more activations, which means more memory. In fact, memory for even a single long sequence can exceed 50GB! Training large models? It’s a real constraint.</p>
 <div class="callout callout-style-default callout-note callout-titled" title="Global Batch Size">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -618,38 +617,37 @@ The intermediate outputs from each neural network layer required to compute grad
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>When we talk about batch size in LLM pre-training, we usually refer to it in terms of the <strong>number of tokens</strong>, not the number of sequences. That is, the token batch size is calculated as <strong>sequence length × number of sequences (micro-batch size)</strong></p>
+<p>In LLM pre-training, batch size typically means <strong>number of tokens</strong>, not sequences. Token batch size is simply <strong>sequence length × micro-batch size</strong>.</p>
 </div>
 </div>
-<p>Typically, the global batch size used in pre-training is extremely large—usually in the <strong>millions of tokens</strong>. And in practice, we start the training with a smaller batch size and gradually increase it over the course of training.</p>
+<p>Real-world pre-training uses massive global batch sizes—often <strong>millions of tokens</strong>. In practice, training begins with smaller batches (for noisy, fast progress), then scales up batch size for stability and accuracy as you approach convergence.</p>
 <ul>
-<li><strong>Small Batch Size:</strong> Used at the <strong>beginning of training</strong> when the loss is high. It provides <strong>quick, noisy signals</strong> that help the model traverse the loss landscape rapidly toward the minima.</li>
-<li><strong>Large Batch Size:</strong> Used as training approaches the optima. It provides a <strong>more accurate gradient direction</strong> (a clearer signal), which reduces noise and ensures confident, stable convergence.</li>
+<li><strong>Small batches:</strong> Early phase, high loss, helps the model learn quickly.</li>
+<li><strong>Big batches:</strong> Later phase, less noise, more stable gradients.</li>
 </ul>
 <p align="center">
 <img src="assets/batch-size.png" alt="Batch Size Intuition" width="100%">
 </p>
 </section>
-<section id="memory-usage-in-transformer" class="level2">
-<h2 class="anchored" data-anchor-id="memory-usage-in-transformer">Memory usage in Transformer</h2>
-<p>To get a sense of the memory usage in a Transformer, let’s take a look at the memory usage of <code>Llama 3.1</code> {<code>8B</code>, <code>70B</code> and <code>13B</code>} models.</p>
+<section id="memory-usage-in-transformers" class="level2">
+<h2 class="anchored" data-anchor-id="memory-usage-in-transformers">Memory Usage in Transformers</h2>
+<p>To appreciate the scale of this, let’s take a look at the memory usage in <code>Llama 3.1</code> models (<code>8B</code>, <code>13B</code>, <code>70B</code>).</p>
 <p align="center">
 <img src="assets/llama-3-1.png" alt="Batch Size Intuition" width="100%">
 </p>
-<p>From this graph, we can clearly see that forshort sequences (or small batch sizes), memory usage for activations is almost negligible, but from around 4K-16K tokens they start to take up a significant amount of memory (this is because of the quadratic scaling with the sequence length, which we discussed earlier), while usage for parameters, gradients, and optimizer states is roughly independent of the sequence length and batch size.</p>
+<p>From this graph, we can clearly see that for short sequences (or small batch sizes), memory usage for activations is almost negligible, but from around 4K-16K tokens they start to take up a significant amount of memory (this is because of the quadratic scaling with the sequence length, which we discussed earlier), while usage for parameters, gradients, and optimizer states is roughly independent of the sequence length and batch size.</p>
 <p>How can we solve this problem of <code>activation explosion</code>? Can we somehow avoide storing all those activations ?</p>
 <section id="solution-1-activation-recomputation" class="level3">
 <h3 class="anchored" data-anchor-id="solution-1-activation-recomputation">Solution 1: Activation Recomputation</h3>
-<p>Recall why we need to store all those activations in the first place ? It is because we need to compute the gradients for the model parameters. So, if we can somehow avoid storing all those activations, we can save a lot of memory.</p>
-<p>One effective approach is <strong>Gradient Checkpointing</strong> also known as <strong>Activation Recomputation</strong>. With this technique, we discard most of the activations during the forward pass to save memory and recompute them on the fly during the backward pass when gradients are needed.</p>
-<p>Normally, we’d store every hidden state between learnable operations (like feedforward layers, layer norm, etc.) to use them during the backward pass. With activation recomputation, we only store activations at specific checkpoints and recalculate everything else during backpropagation. This helps us manage memory while training large models. The process typically looks like this:</p>
+<p>Why do we <strong>store all these activations</strong>? We need them to compute parameter gradients during backward pass. What if we could avoid keeping every activation in memory?</p>
+<p>This is what <strong>gradient checkpointing</strong> does, which is also known as <strong>activation recomputation</strong>. With this technique, we keep only a few activations in memory during the forward pass and recompute the missing ones <code>on-the-fly</code> during backward. We save memory, but at the cost of more compute!</p>
+<p>Normally, we’d store every hidden state between learnable operations (like feedforward layers, layer norm, etc.) to use them during the backward pass. With activation recomputation, we only store activations at specific checkpoints and recalculate everything else during backpropagation. This helps us manage memory while training large models.</p>
 <p align="center">
 <img src="assets/gradient-accumulation-1.png" alt="Gradient Accumulation" width="70%">
 </p>
-<p>But as we know in life, there is no free lunch. Although we save memory by discarding most of the activations during the forward pass, we spend some extra compute to recompute these activations on the fly during the backward pass.</p>
-<p>There are a few ways to do activation checkpointing, and each involves different memory and compute tradeoffs.</p>
-<p>The most aggressive approach is called <strong>Full Activation Checkpointing</strong>, where you only store activations at the end of each layer (instead of storing every intermediate activation). This method is great for memory since you’re keeping so little, but it’s the most compute-heavy, often increasing computation time by 30–40% because you have to recompute almost everything during backpropagation.</p>
-<p>But do we really need to treat every part of the model the same? By profiling, we find that the main memory culprit is the activations from the <strong>Multi-Headed Attention (MHA)</strong> layers, since they scale quadratically with sequence length.</p>
+<p>But there is no free lunch, although memory is saved, we pay with extra computation as activations are re-created during backward. There are a few ways to do activation checkpointing, and each involves different memory and compute tradeoffs.</p>
+<p>The most aggressive approach is called <strong>Full Activation Checkpointing</strong>, where you only store activations at the end of each layer (instead of storing every intermediate activation). This method is great for memory since you’re keeping so little, but it’s the most compute-heavy, often increasing computation time by 30–40% because you have to <code>recompute</code> almost everything during backpropagation.</p>
+<p>But do we really need to treat every part of the model the same? By profiling, we find that the main memory culprit is the activations from the <strong>Multi-Headed Attention (MHA)</strong> layers, since they scale <code>quadratically</code> with sequence length.</p>
 <p>This leads to a more balanced strategy: <strong>Selective Checkpointing</strong>. Here, we only skip storing activations for the heavy MHA layers and still store them for the lighter MLP layers. The payoff is impressive: up to 70% memory savings for only about 2.7% extra computation.</p>
 <div class="callout callout-style-default callout-note callout-titled" title="Activation Checkpointing on Llama 3.1 8B model">
 <div class="callout-header d-flex align-content-center">
@@ -661,32 +659,33 @@ The intermediate outputs from each neural network layer required to compute grad
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>As you can see the graph bellow, on an 8-billion parameter model with a batch size of 1 and sequence length 4096, activation memory without any checkpointing can hit 97 GB, which is enough to break most GPUs. With selective activation checkpointing, that drops to 17 GB. And with full checkpointing, at the extreme, memory usage can go down to just 1 GB!</p>
+<p>As you can see the graph bellow, on an <strong>8B parameter model</strong> with a <strong>batch size of 1</strong> and <strong>sequence length 4096</strong>, activation memory without any checkpointing can hit 97 GB, which is enough to break most GPUs. With <code>selective activation checkpointing</code>, that drops to 17 GB. And with <code>full checkpointing</code>, at the extreme, memory usage can go down to just 1 GB!</p>
 </div>
 </div>
 <p align="center">
 <img src="assets/llama-checkp.png" alt="Gradient Accumulation" width="100%">
 </p>
 <p>Now that we’ve learned about recomputation, we can tame the activation memory usage we saw in the previous graphs!</p>
-<p>However, activations still have a linear dependence on the batch size, so as we move to larger batch sizes this might become an issue again. So, what can we do to increase the batch size ? And to takle this we have the next trick in our box - <strong>gradient accumulation</strong>, lets discuss that next.</p>
+<p>However, activations still have a linear dependence on the batch size, so as we move to larger batch sizes this might become an issue again. So, what can we do to increase the batch size ?</p>
+<p>And to tackle this we have the next trick in our box, <strong>gradient accumulation</strong>, which we will discuss next.</p>
 </section>
 <section id="solution-2-gradient-accumulation" class="level3">
 <h3 class="anchored" data-anchor-id="solution-2-gradient-accumulation">Solution 2: Gradient Accumulation</h3>
-<p><strong>Gradient Accumulation</strong> is a technique that allows us to accumulate gradients over multiple micro-batches before performing a single global optimization step. This is particularly useful when we have a large batch size and we want to avoid running out of memory.</p>
-<p>The general idea is to split the batch into smaller micro-batches (let’s say 3) and process them one by one. We compute the gradients for each micro-batch and accumulate them (we <strong>do not do</strong> <code>optimizer.step()</code> after each micro-batch). And after processing all the micro-batches, <strong>we perform a single</strong> global optimization step.</p>
+<p><strong>Gradient Accumulation</strong> is a technique that allows us to accumulate gradients over <code>multiple micro-batches</code> before performing a single global optimization step. This is particularly useful when we have a large batch size and we want to avoid running out of memory.</p>
+<p>The general idea is to split the batch into smaller micro-batches (let’s say 3) and process them one by one. We compute the gradients for each micro-batch and accumulate them (we <strong>do not do</strong> <code>optimizer.step()</code> after each micro-batch). And after processing all the micro-batches, <strong>we perform a single global optimization step</strong>.</p>
 <p align="center">
 <img src="assets/grad-acc.png" alt="Gradient Accumulation" width="100%">
 </p>
-<p>Let’s take an example of a simple linear regression model:</p>
-<p>Let’s use a different analogy: predicting the <strong>score of a student on a test</strong> based on two factors—the number of hours studied (<span class="math inline">\(x_1\)</span>) and the number of hours slept the night before (<span class="math inline">\(x_2\)</span>). We assume a simple linear relationship between these inputs and the output score:</p>
-<p><span class="math display">\[
+<p>Let’s take an example of a simple linear regression model, predicting the <strong>score of a student on a test</strong> based on two factors:</p>
+<ul>
+<li>the <code>number of hours studied</code> (<span class="math inline">\(x_1\)</span>) and</li>
+<li>the <code>number of hours slept the night before</code> (<span class="math inline">\(x_2\)</span>).</li>
+</ul>
+<p>We assume a simple linear relationship between these inputs and the output score: <span class="math display">\[
 \text{score}_{pred} = x_1 w_1 + x_2 w_2 + b
-\]</span></p>
-<p>Our aim is to use stochastic gradient descent to determine the best values for <span class="math inline">\(w_1\)</span>, <span class="math inline">\(w_2\)</span>, and <span class="math inline">\(b\)</span> such that the mean squared error (MSE) between the actual score (<span class="math inline">\(\text{score}_{target}\)</span>) and the predicted score (<span class="math inline">\(\text{score}_{pred}\)</span>) is minimized:</p>
-<p><span class="math display">\[
+\]</span> Our aim is to use stochastic gradient descent to determine the best values for <span class="math inline">\(w_1\)</span>, <span class="math inline">\(w_2\)</span>, and <span class="math inline">\(b\)</span> such that the mean squared error (MSE) between the actual score (<span class="math inline">\(\text{score}_{target}\)</span>) and the predicted score (<span class="math inline">\(\text{score}_{pred}\)</span>) is minimized: <span class="math display">\[
 \underset{w_1, w_2, b}{\mathrm{argmin}} \; (\text{score}_{pred} - \text{score}_{target})^2
-\]</span></p>
-<p>Without gradient accumulation, we would update the parameters after each batch of student’s data.</p>
+\]</span> Without gradient accumulation, we would update the parameters after each batch of student’s data.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
 <ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" role="tab" aria-controls="tabset-2-1" aria-selected="true" href="">Without Gradient Accumulation</a></li></ul>
 <div class="tab-content">
@@ -721,7 +720,8 @@ The intermediate outputs from each neural network layer required to compute grad
 </div>
 </div>
 </div>
-<p>With <strong>gradient accumulation</strong>, instead of updating the parameters after each batch of data, we accumulate gradients across several micro-batches (<code>micro_batch_size = 3</code>) and then update all at once. This allows us to train with larger effective batch sizes even if memory is limited.</p>
+<p>With <strong>gradient accumulation</strong>, instead of updating the parameters after each batch of data, we accumulate gradients across several micro-batches (<code>micro_batch_size = 3</code>) and then update all at once.</p>
+<p>This allows us to train with larger effective batch sizes even if memory is limited.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
 <ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-3-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-1" role="tab" aria-controls="tabset-3-1" aria-selected="true" href="">With Gradient Accumulation</a></li></ul>
 <div class="tab-content">
@@ -758,21 +758,23 @@ The intermediate outputs from each neural network layer required to compute grad
 </div>
 </div>
 </div>
-<p>Gradient accumulation allows us to reduce activation memory, which grows linearly with batch size, by processing smaller micro-batches sequentially. This reduces stored activations and gradients since only one micro-batch’s worth of activations needs to be kept in memory at a time, which helps reduce the overall activation memory footprint.</p>
-<p>Again there is no free lunch. As gradient accumulation requires multiple consecutive forward/backward passes per optimization step, it increases the compute overhead and slows down training. But it allows us to train with larger effective batch sizes even if memory is limited.</p>
-<p>So far, we’ve seen how techniques like <code>gradient checkpointing</code> and <code>gradient accumulation</code> help deal with the memory blowup issue caused by <code>activations</code>: the dynamic part of memory usage. Both allow us to fit larger models or batches on a <strong>single GPU</strong>, but mostly by working sequentially and slowing down training. However, these don’t address the static memory required for parameters, gradients, and optimizer states, nor do they fully utilize available hardware (assume we have more than one GPU).</p>
-<p>To tackle this, we can scale training across multiple GPUs using <strong>Data Parallelism</strong>. By splitting micro-batches and processing them simultaneously on several GPUs, we address both memory and compute bottlenecks, and that is what we will discuss in the next section.</p>
+<p><strong>Gradient accumulation</strong> allows us to reduce activation memory, which grows linearly with batch size, by processing smaller micro-batches sequentially. This reduces stored activations and gradients since only one micro-batch’s worth of activations needs to be kept in memory at a time, which helps reduce the overall activation memory footprint.</p>
+<p>Again, there’s a trade-off: gradient accumulation increases computation (more forward/backward passes before each optimizer step), so it can slow down training. But it enables much larger effective batch sizes on limited hardware.</p>
+<p>So far, we’ve seen how techniques like <code>gradient checkpointing</code> and <code>gradient accumulation</code> help deal with the memory blowup issue caused by <code>activations</code>: the <strong>dynamic memory usage</strong>.</p>
+<p>Both allow us to fit larger models or batches on a <strong>single GPU</strong>, but mostly by working sequentially and slowing down training. However, these don’t address the <strong>static memory</strong> required for parameters, gradients, and optimizer states, nor do they fully utilize available hardware (assume we have more than one GPU).</p>
+<p>To tackle this, we can scale training across multiple GPUs using <strong>Data Parallelism</strong>. By splitting micro-batches and processing them simultaneously on several GPUs, we address both memory and compute bottlenecks.</p>
 </section>
 </section>
 <section id="scaling-with-multiple-gpus-data-parallelism-dp" class="level2">
 <h2 class="anchored" data-anchor-id="scaling-with-multiple-gpus-data-parallelism-dp">Scaling with Multiple GPUs: Data Parallelism (DP)</h2>
-<p>Recall that in Gradient Accumulation, we were processing <strong>micro-batches (MBS)</strong> sequentially. Since these micro-batches are <strong>independent of each other</strong>, we can process them <strong>parallelly on different GPUs</strong>. Something like this, if you see carefully now we are processing the micro-batches in parallel on different GPUs, w.r.t what we did in Gradient Accumulation where we were processing the micro-batches sequentially on a single GPU:</p>
+<p>Recall that in Gradient Accumulation, we were processing <strong>micro-batches (MBS)</strong> sequentially. Since these micro-batches are <strong>independent of each other</strong>, we can process them <strong>parallelly on different GPUs</strong>.</p>
+<p>Something like this below: if you look carefully, now we are processing the <code>micro-batches</code> in <strong>parallel</strong> on different GPUs, whereas in Gradient Accumulation we were processing the <code>micro-batches</code> <strong>sequentially</strong> on a single GPU. This is what we do in Data Parallelism (DP).</p>
 <p align="center">
 <img src="assets/dp.png" alt="Data Parallelism" width="100%">
 </p>
 <section id="the-data-parallel-setup" class="level3">
 <h3 class="anchored" data-anchor-id="the-data-parallel-setup">The Data Parallel Setup</h3>
-<p>In a Data Parallel setup, we distribute the data across multiple GPUs, while maintaining a full, redundant replica of the model parameters, gradients, and optimizer states on each GPU.</p>
+<p>In a Data Parallel setup, we distribute the data across multiple GPUs, while maintaining a full, redundant replica of the <code>model parameters</code>, <code>gradients</code>, and <code>optimizer states</code> on each GPU.</p>
 <ol type="1">
 <li><strong>Replication:</strong> We maintain a full, redundant <strong>replica</strong> of the model parameters (<span class="math inline">\(\Phi\)</span>), gradients (<span class="math inline">\(\nabla \Phi\)</span>), and optimizer states (<span class="math inline">\(\Phi_{\text{optim}}\)</span>) on <strong>each GPU</strong>.</li>
 </ol>
@@ -780,7 +782,7 @@ The intermediate outputs from each neural network layer required to compute grad
 <img src="assets/dp_1.png" alt="Data Parallel Setup" width="100%">
 </p>
 <ol start="2" type="1">
-<li><strong>Parallel Processing:</strong> Each GPU processes a unique micro-batch simultaneously. This involves <strong>same operations, different data</strong>.</li>
+<li><strong>Parallel Processing:</strong> Each GPU processes a unique micro-batch simultaneously. This involves <strong>same operations, different data</strong>, which is also known as <code>SIMD</code> (Single Instruction Multiple Data).</li>
 </ol>
 <p align="center">
 <img src="assets/dp_2.png" alt="Data Parallel Setup" width="100%">
@@ -791,12 +793,12 @@ The intermediate outputs from each neural network layer required to compute grad
 <p align="center">
 <img src="assets/dp_3.png" alt="Data Parallel Setup" width="100%">
 </p>
-<p>If you look carefully, we can perform the forward pass and the backward pass in parallel on different GPUs. But we cannot perform the optimizer step and update the parameters independently on different GPUs. If we do that, we will end up training N different models on N different GPUs which is not what we want.</p>
-<p>So, after the backward pass, we need to somehow synchronize the gradients across the GPUs. And this is done by the <strong>All-Reduce</strong> primitive.</p>
+<p>If you look carefully, we <strong>can</strong> perform the forward pass and the backward pass in <strong>parallel</strong> on different GPUs. But we <strong>cannot</strong> perform the optimizer step and update the parameters independently on different GPUs. If we do that, we will end up training <code>N</code> different models on <code>N</code> different GPUs which is not what we want.</p>
+<p>So, after the backward pass, we need to synchronize the gradients across the GPUs. This is accomplished using the <strong>All-Reduce</strong> primitive.</p>
 </section>
 <section id="gradient-synchronization-the-all-reduce-primitive" class="level3">
 <h3 class="anchored" data-anchor-id="gradient-synchronization-the-all-reduce-primitive">Gradient Synchronization: The All-Reduce Primitive</h3>
-<p>Before we dive into the All-Reduce operation, it’s important to note that NVIDIA provides a rich set of <strong>communication primitives</strong> as part of its distributed training ecosystem such as NCCL(NVIDIA’s collective communication library). These primitives simplify and accelerate multi-GPU (and multi-node) communication, enabling efficient synchronization and sharding operations required for large-scale training.</p>
+<p>Before we dive into the <strong>All-Reduce</strong> operation, it’s important to note that NVIDIA provides a rich set of <strong>communication primitives</strong> as part of its distributed training ecosystem such as <strong>NCCL</strong> (NVIDIA’s collective communication library). These primitives simplify and accelerate multi-GPU (and multi-node) communication, enabling efficient synchronization and sharding operations required for large-scale training.</p>
 <div class="callout callout-style-default callout-note callout-titled" title="Communication Primitives in Distributed Training">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -807,7 +809,8 @@ The intermediate outputs from each neural network layer required to compute grad
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong>All-Reduce</strong> is just one such primitive—used specifically for synchronizing gradients across GPUs at the end of each backward pass in standard Data Parallel training. However, there are several other primitives (like <strong>All-Gather</strong>, <strong>Reduce-Scatter</strong>, <strong>Broadcast</strong>, etc.) designed for different patterns of communication and parallelism. We will encounter and discuss these additional primitives as we explore more advanced parallelization techniques (e.g., ZeRO, model sharding, tensor parallelism) later in the series.</p>
+<p><strong>All-Reduce</strong> is just one such primitive, used specifically for synchronizing gradients across GPUs at the end of each backward pass in standard Data Parallel training. However, there are several other primitives (like <strong>All-Gather</strong>, <strong>Reduce-Scatter</strong>, <strong>Broadcast</strong>, etc.) designed for different patterns of communication and parallelism.</p>
+<p>We will discuss these additional primitives as we encounter them while exploring more advanced parallelization techniques (e.g., ZeRO, model sharding, and tensor parallelism) later in the series.</p>
 </div>
 </div>
 <p>For now, let’s look at <strong>All-Reduce</strong> in detail, since this is exactly what we need for synchronizing the gradients during Data Parallel training.</p>
@@ -820,16 +823,16 @@ The intermediate outputs from each neural network layer required to compute grad
 <p align="center">
 <img src="assets/all_reduce.png" alt="All Reduce" width="70%">
 </p>
-<p>Once every node receives the global gradient, it performs the <strong><code>optimizer.step()</code></strong> operation independently, ensuring all model copies remain in sync. These collective operations are defined in the <strong><code>torch.distributed</code></strong> API.</p>
+<p>Once every node receives the global gradient, it performs the <strong><code>optimizer.step()</code></strong> operation independently, ensuring all model copies remain in <code>sync</code>. These collective operations are defined in the <strong><code>torch.distributed</code></strong> API.</p>
 <p>Here I’ve a machine with 4 T4 GPUs.</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">ray@ip-10-0-69-225:code$</span> nvidia-smi <span class="at">-L</span></span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">GPU</span> 0: Tesla T4 <span class="er">(</span><span class="ex">UUID:</span> GPU-31a1b562-c769-c7f1-ede1-48847cec8d53<span class="kw">)</span></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="ex">GPU</span> 1: Tesla T4 <span class="er">(</span><span class="ex">UUID:</span> GPU-1beaf204-f6f7-182d-67f8-aee6c58128df<span class="kw">)</span></span>
 <span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="ex">GPU</span> 2: Tesla T4 <span class="er">(</span><span class="ex">UUID:</span> GPU-934ca246-df7e-2c7f-4bdd-b07859e46b2d<span class="kw">)</span></span>
 <span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="ex">GPU</span> 3: Tesla T4 <span class="er">(</span><span class="ex">UUID:</span> GPU-141171cb-db62-b770-97ff-955f8c7f2265<span class="kw">)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Now let’s create a simple example to demonstrate the <strong>All-Reduce</strong> operation by creating 4 tensors on each GPU and performing the <strong>All-Reduce</strong> operation on them.</p>
+<p>Now let’s create a simple example to demonstrate the <strong>All-Reduce</strong> operation by creating a tensor on each of the 4 GPUs and performing the <strong>All-Reduce</strong> operation on them.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-4-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-1" role="tab" aria-controls="tabset-4-1" aria-selected="true" href="">All-Reduce Example</a></li></ul>
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-4-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-1" role="tab" aria-controls="tabset-4-1" aria-selected="true" href="">dist_all_reduce.py</a></li></ul>
 <div class="tab-content">
 <div id="tabset-4-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-4-1-tab">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
@@ -852,7 +855,7 @@ The intermediate outputs from each neural network layer required to compute grad
 </div>
 </div>
 </div>
-<p>We can run this code on 4 GPUs using the following command:</p>
+<p>We can run this code on 4 GPUs using <code>torchrun</code>:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">torchrun</span> <span class="at">--nproc_per_node</span><span class="op">=</span>4 dist_all_reduce.py</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>We will get the following output:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">Before</span> all_reduce on rank 3: tensor<span class="er">(</span><span class="ex">[4.,</span> 4., 4.], device=<span class="st">'cuda:3'</span><span class="kw">)</span></span>
@@ -867,15 +870,15 @@ The intermediate outputs from each neural network layer required to compute grad
 </section>
 <section id="overlapping-communication-and-computation" class="level3">
 <h3 class="anchored" data-anchor-id="overlapping-communication-and-computation">Overlapping Communication and Computation</h3>
-<p>In a naive DP implementation, the GPUs sit <strong>idle</strong> during the communication phase, as the <strong>All-Reduce</strong> operation begins only after <strong>all</strong> gradients are computed in the backward pass. This is inefficient.</p>
+<p>In a naive/vanilla DP implementation, the GPUs sit <strong>idle</strong> during the communication phase, as the <strong>All-Reduce</strong> operation begins only after <strong>all</strong> gradients are computed in the backward pass. This is inefficient.</p>
 <p align="center">
 <img src="assets/all_reduce.gif" alt="All Reduce" width="100%">
 </p>
-<p>To eliminate this idle time, we <strong>overlap</strong> the communication and computation.</p>
+<p>To eliminate this idle time, we try to <strong>overlap</strong> the communication and computation as much as possible.</p>
 <ul>
 <li><strong>Method:</strong> As soon as the gradient for a specific layer is computed during the backward pass (e.g., <span class="math inline">\(\nabla L_2\)</span>), we immediately trigger the <strong>All-Reduce</strong> for that gradient <strong>in the background</strong>.</li>
 <li><strong>Rationale:</strong> The computation of the next layer’s gradient (<span class="math inline">\(\nabla L_1\)</span>) is independent of the communication of the previous layer’s gradient (<span class="math inline">\(\nabla L_2\)</span>).</li>
-<li><strong>Implementation:</strong> This technique is implemented via <strong>hooks</strong> in PyTorch (like <code>post_accumulate_grad_hook</code>), allowing the next computation step to proceed while the communication step runs concurrently, significantly improving throughput. It attach an all-reduce hook function to each parameter that requires gradients. So, now it communicates more frequently but in smaller packets.</li>
+<li><strong>Implementation:</strong> This technique is implemented via <strong>hooks</strong> in PyTorch (like <code>post_accumulate_grad_hook()</code>), allowing the next computation step to proceed while the communication step runs concurrently, significantly improving throughput. It attaches an <code>all-reduce hook function</code> to each parameter that requires gradients. With this implementation, it communicates more frequently but in smaller packets.</li>
 </ul>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
 <ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-5-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-1" role="tab" aria-controls="tabset-5-1" aria-selected="true" href="">Overlapping Communication and Computation</a></li></ul>
@@ -892,16 +895,17 @@ The intermediate outputs from each neural network layer required to compute grad
 </div>
 </div>
 </div>
-<p>Before while communication was happening, we were waiting for all the gradients to be computed in the backward pass.</p>
+<p>Previously, while communication was happening, we had to <strong>wait</strong> for all the gradients to be computed in the backward pass.</p>
 <p align="center">
 <img src="assets/dp_overlap1.png" alt="All Reduce" width="100%">
 </p>
-<p>But now, we are overlapping the communication and computation. So, we are not waiting for all the gradients to be computed in the backward pass. We are computing the gradients for the next layer while the communication for the previous layer is happening.</p>
+<p>But now, we are <strong>overlapping</strong> the communication and computation. So, we are not <strong>waiting</strong> for all the gradients to be computed in the backward pass. We are computing the gradients for the next layer while the communication for the previous layer is happening.</p>
 <p align="center">
 <img src="assets/dp_overlap2.png" alt="All Reduce" width="100%">
 </p>
-<p>We can infact do better and communicate more efficiently by grouping the gradients into larger buckets and performing the All-Reduce operation on them. Its like packing items into boxes before shipping (have you seen at times while placing an order on Amazon, they offer us to pack multiple items into a single box to save on shipping costs ?, well thats what we are doing here but with gradients).</p>
-<p>With this we can significantly reduce the communication overhead and speed up the computation operations.</p>
+<p>We can, in fact, do even better and communicate more efficiently by grouping the gradients into larger buckets and performing the <strong>All-Reduce</strong> operation on these buckets.</p>
+<p>It’s like packing items into boxes before shipping. (Have you noticed that, when placing an order on Amazon, they sometimes offer to pack multiple items into a single box to save on shipping costs? That’s exactly what we’re doing here, but with <strong>gradients</strong>.)</p>
+<p>With this approach, we can significantly reduce communication overhead and speed up computation.</p>
 <p align="center">
 <img src="assets/dp_overlap3.png" alt="All Reduce" width="100%">
 </p>
@@ -909,9 +913,14 @@ The intermediate outputs from each neural network layer required to compute grad
 </section>
 <section id="the-limitations-of-simple-data-parallelism-dp" class="level2">
 <h2 class="anchored" data-anchor-id="the-limitations-of-simple-data-parallelism-dp">The Limitations of Simple Data Parallelism (DP)</h2>
-<p>Now, that we have seen how to scale out the training with multiple GPUs using Data Parallelism, we can ask ourselves a question - is this scaling <strong>lossless</strong> ?</p>
-<p>The answer is no. There’s a communication overhead associated with the Data Parallelism. And as the degree of data parallelism increases, there’s a noticeable drop in tokens per second per GPU (throughput). Although we are overlapping the communication and computation, we are still waiting for the gradients to be computed in the backward pass.</p>
-<p>More importantly, all these discussions about Data Parallelism (DP) so far have assumed that the <strong>entire model</strong> can fit on a single GPU. But what if the model is too large (e.g.&nbsp;GPT-3 with 175B parameters) to fit in the memory of a single GPU (NVIDIA A100 with 80GB of memory)?</p>
+<p>Now that we’ve explored how to scale up training on multiple GPUs using Data Parallelism, a natural question arises: does this scaling result in perfect, linear performance gains? In other words, do we get proportional speedup as we add more GPUs?</p>
+<p>The reality is more nuanced. Although data parallelism cleverly overlaps the all-reduce gradient synchronization with backward computation, these efficiency gains don’t hold up indefinitely. As the number of GPUs increases—into the hundreds or thousands, the cost of coordination and the demands on the networking infrastructure start to rise quickly. Eventually, with each additional GPU, the improvements in throughput diminish, and the overall system efficiency drops.</p>
+<p align="center">
+<img src="assets/dp_perf.png" alt="Data Parallelism Limitations" width="100%">
+</p>
+<p>The chart above shows that as we add GPUs, <strong>throughput degrades noticeably</strong>, even though the <strong>memory usage per GPU remains unchanged</strong> regardless of the number of data parallel workers.</p>
+<p>Data parallelism was our first (simple) strategy to scale training across more GPUs.</p>
+<p>However, our discussion so far has rested on the assumption that the <strong>entire model</strong> fits comfortably within the memory of a single GPU. But what happens when models grow so large (such as GPT-3, with 175 billion parameters) that they can no longer fit into one GPU’s memory (e.g., an NVIDIA A100 with 80GB of RAM)?</p>
 <p align="center">
 <img src="assets/model_hw.png" alt="Model Exceeds GPU Memory" width="50%">
 </p>
@@ -920,7 +929,7 @@ The intermediate outputs from each neural network layer required to compute grad
 </section>
 <section id="zero-zero-redundancy-optimizer" class="level1">
 <h1>ZeRO: Zero Redundancy Optimizer</h1>
-<p>ZeRO (Zero Redundancy Optimizer) is a family of techniques that addresses constrain of static memory (parameters, gradients, optimizer states) on a single GPU. With ZeRO, we can train models that don’t fit on a single GPU, and it does that by sharding the static memory components across multiple GPUs.</p>
+<p>ZeRO (Zero Redundancy Optimizer) is a family of techniques that addresses constrain of <strong>static memory</strong> (<code>parameters</code>, <code>gradients</code>, <code>optimizer states</code>) on a single GPU. With ZeRO, we can train models that don’t fit on a single GPU, and it does that by <strong>sharding</strong> the static memory components across multiple GPUs.</p>
 <p>This approach is organized into three possible optimization stages:</p>
 <ul>
 <li><strong>ZeRO-1</strong>: optimizer state sharding</li>
@@ -930,10 +939,11 @@ The intermediate outputs from each neural network layer required to compute grad
 <p align="center">
 <img src="assets/zero.png" alt="ZeRO" width="100%">
 </p>
-<p>Without even going further, you can probably guess that, with this approch we need to do a lot of communication between the GPUs. But as we have seen in the previous section, we can overlap the communication and computation to some extent. So, we can reduce the communication overhead by overlapping the communication and computation.</p>
+<p>Without even going further, you can probably guess that, with this approch we need to do a <code>lot of communication</code> between the GPUs.</p>
+<p>But as we have seen in the previous section, we can overlap the communication and computation to some extent. So, we can reduce the communication overhead by overlapping the communication and computation.</p>
 <p>Let’s discuss each of these techniques in detail, starting with <strong>ZeRO-1</strong>.</p>
 <section id="zero-1-sharding-optimizer-states" class="level3">
-<h3 class="anchored" data-anchor-id="zero-1-sharding-optimizer-states">ZeRO-1: Sharding Optimizer States</h3>
+<h3 class="anchored" data-anchor-id="zero-1-sharding-optimizer-states">ZeRO-1: Sharding <code>Optimizer States</code></h3>
 <p>Recall from our earlier discussion, the <strong>static memory footprint</strong> per GPU specifically for <strong>mixed precision (using BF16 + FP32)</strong>:</p>
 <table class="caption-top table">
 <colgroup>
@@ -944,10 +954,10 @@ The intermediate outputs from each neural network layer required to compute grad
 </colgroup>
 <thead>
 <tr class="header">
-<th style="text-align: left;">Component</th>
+<th style="text-align: left;">Memory Component</th>
 <th style="text-align: left;">Precision</th>
 <th style="text-align: left;">Size (<span class="math inline">\(\Psi\)</span> Bytes)</th>
-<th style="text-align: left;">Rationale</th>
+<th style="text-align: left;">Description</th>
 </tr>
 </thead>
 <tbody>
@@ -983,7 +993,8 @@ The intermediate outputs from each neural network layer required to compute grad
 </tr>
 </tbody>
 </table>
-<p>The largest part of the static memory comes from the <strong>optimizer states</strong>, especially for optimizers like Adam, which maintain both first and second moment statistics. <strong>With Data Parallelism (DP), all these components are duplicated on every GPU</strong> in the data-parallel group, so each device bears the full cost (<span class="math inline">\(16\Psi\)</span>) of these tensors (ignoring activations for now).</p>
+<p>The largest part of the static memory comes from the <strong>optimizer states</strong>, especially for optimizers like Adam, which maintain both first and second moment statistics.</p>
+<p><strong>With DP</strong>, all these components are duplicated on every GPU in the data-parallel group, so each device bears the full cost (<span class="math inline">\(16\Psi\)</span>) of these tensors (ignoring activations for now).</p>
 <div class="callout callout-style-default callout-note callout-titled" title="Important Caveat: Master Weights Are Part of Optimizer State Sharding">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -994,18 +1005,18 @@ The intermediate outputs from each neural network layer required to compute grad
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>When discussing the sharding of optimizer states in ZeRO, we must also include the <strong>master weights</strong> (the FP32 copy of model parameters used for the optimizer update) in the sharding calculation. Both the optimizer states and these master weights are stored in FP32, and both are sharded together in ZeRO-1. Thus, when you see references to “optimizer state sharding,” this always implicitly includes master weights in modern mixed precision training setups.</p>
+<p>When discussing the sharding of optimizer states in ZeRO, we must also include the <strong>master weights</strong> (the FP32 copy of model parameters used for the optimizer update) in the sharding calculation. Both the optimizer states and these master weights are stored in FP32, and both are sharded together in ZeRO-1.</p>
+<p>Thus, when you see references to <code>optimizer state sharding</code>, this always implicitly includes <strong>master weights</strong> in modern mixed precision training setups.</p>
 </div>
 </div>
-<p>With <strong>ZeRO-1</strong>, the goal is to <em>shard</em> (that is, partition and spread) the <strong>FP32 optimizer states</strong> and <strong>FP32 master weights</strong> across the <span class="math inline">\(N_d\)</span> GPUs, rather than storing them fully on each device. This introduces the following changes:</p>
+<p>With <strong>ZeRO-1</strong>, the goal is to <strong>shard</strong> (that is, partition and spread) the <strong>FP32 optimizer states</strong> and <strong>FP32 master weights</strong> across the <span class="math inline">\(N_d\)</span> GPUs, rather than storing them fully on each device. This introduces the following changes:</p>
 <ul>
-<li>Every GPU stores only a <strong><span class="math inline">\(1/N_d\)</span> -th slice</strong> of the optimizer states (<span class="math inline">\(8\Psi\)</span>) and master weights (<span class="math inline">\(4\Psi\)</span>), rather than the full <span class="math inline">\(12\Psi\)</span>.</li>
-<li>The parameter tensors and gradients (in BF16) <strong>remain fully replicated</strong> on each GPU for compatibility with forward and backward passes.</li>
+<li>Every GPU stores only a <span class="math inline">\(\frac{1}{N_d}\)</span>th slice of the <code>optimizer states</code> (<span class="math inline">\(8\Psi\)</span>) and <code>master weights</code> (<span class="math inline">\(4\Psi\)</span>), rather than the full <span class="math inline">\(12\Psi\)</span>.</li>
+<li>The <code>parameters</code> and <code>gradients</code> tensors (in BF16) remain fully replicated on each GPU for compatibility with forward and backward passes.</li>
 </ul>
 <p align="center">
 <img src="assets/zero-1.png" alt="ZeRO-1" width="100%">
 </p>
-<p>So, <strong>ZeRO-1 directly reduces redundant memory used by both FP32 optimizer states and master weights</strong>. The per-GPU memory for these states drops from <span class="math inline">\(12\Psi\)</span> down to <span class="math inline">\(\frac{12\Psi}{N_d}\)</span>. The other (BF16) tensors remain replicated for performance and simplicity.</p>
 <p>The resulting <strong>static memory footprint per GPU</strong> with ZeRO-1 sharding thus becomes: <span class="math display">\[
 \mathcal{M}_{\text{ZeRO-1}} = 2\Psi + 2\Psi + \frac{12\Psi}{N_d}
 \]</span></p>
@@ -1014,30 +1025,29 @@ The intermediate outputs from each neural network layer required to compute grad
 <li>Gradients (BF16): <span class="math inline">\(2\Psi\)</span></li>
 <li>Optimizer States + Master Weights (FP32): <span class="math inline">\(\frac{12\Psi}{N_d}\)</span></li>
 </ul>
-<p>Where the first two terms represent the fully replicated BF16 weights and gradients, and the last term is the optimizer states and FP32 master weights sharded across <span class="math inline">\(N_d\)</span> GPUs.</p>
 <p>Just to make this more concrete, let’s look at some practical numbers. Suppose you have a modern <strong>A100/H100 GPU</strong> with <strong>80GB</strong> of memory. In DP, the largest model you can fit is roughly:</p>
 <p><span class="math display">\[
 \text{Max Parameters (DP)} = \frac{80~\text{GB}}{16~\text{bytes per param}} \approx 5~\text{billion parameters}
 \]</span></p>
-<p>But if you apply ZeRO-1 with <strong>64 GPUs</strong> (<span class="math inline">\(N_d = 64\)</span>), the optimizer state and master weights are now only a small shard per GPU:</p>
+<p>But if you apply ZeRO-1 with <strong>64 GPUs</strong> (<span class="math inline">\(N_d = 64\)</span>), the optimizer states and master weights are now only a small shard per GPU:</p>
 <ul>
 <li><span class="math inline">\(\frac{12}{64} \approx 0.1875\)</span> (so just 1.5GB of optimizer/master weights per GPU for a 5B model)</li>
-<li>The effective static memory per parameter drops from 16 bytes (DP) to about <strong>4.2 bytes</strong> (ZeRO-1).</li>
+<li>The effective static memory per parameter drops from <strong>16 bytes</strong> (DP) to about <strong>4.2 bytes</strong> (ZeRO-1).</li>
 </ul>
 <p>So now, the largest model you can train on that same 80GB GPU jumps to:</p>
 <p><span class="math display">\[
 \text{Max Parameters (ZeRO-1, 64 GPUs)} = \frac{80~\text{GB}}{4.2~\text{bytes per param}} \approx 19~\text{billion parameters}
 \]</span></p>
-<p>So, its great that we can train a larger model on the same hardware, but we still need to discuss the communication overhead associated with this approach.</p>
-<p>For the forward pass, we <strong>don’t</strong> need to do any communication, as we have all the parameters in each GPU.</p>
+<p>So, it’s great that we can train a larger model on the same hardware, but we still need to discuss the communication overhead involved in this approach.</p>
+<p>For the <code>forward pass</code>, we <strong>don’t</strong> need to do any communication, as we have all the parameters in each GPU.</p>
 <p align="center">
 <img src="assets/zero-1_1.png" alt="ZeRO-1 Backward" width="100%">
 </p>
-<p>Next in the backward pass, we have all the gradients in each GPU. So, we need to do a <strong>All-Reduce</strong> and at this point we have the same gradients on all the GPUs.</p>
+<p>During the <code>backward pass</code>, each GPU computes gradients for all parameters, so every GPU holds a full copy of the gradients. To ensure the gradients are synchronized across all GPUs, we perform an <strong>All-Reduce</strong> operation. After this step, all GPUs have identical, synchronized gradients.</p>
 <p align="center">
 <img src="assets/zero-1_2.png" alt="ZeRO-1 Backward" width="100%">
 </p>
-<p>But now on each GPU, we can <em>discard</em> all the other gradients and <em>keep only the one</em> whose corresponding optimizer state is present on that particular GPU.</p>
+<p>But now, on each GPU, we can <em>discard</em> all gradients except the one corresponding to the optimizer state stored on that particular GPU, and <em>keep only that one</em>.</p>
 <p align="center">
 <img src="assets/zero-1_3.png" alt="ZeRO-1 Backward" width="100%">
 </p>
@@ -1045,15 +1055,15 @@ The intermediate outputs from each neural network layer required to compute grad
 <p align="center">
 <img src="assets/zero-1_4.png" alt="ZeRO-1 Backward" width="100%">
 </p>
-<p>And at this point, we need to communicate again, to get the updated model parameters on all the GPUs, as at this point each GPU has the updated model parameters only for its own shard of the optimizer state.</p>
+<p>At this point, we need to communicate again to ensure that all GPUs have the updated model parameters. After the update step, each GPU holds the updated parameters only for its own shard of the optimizer state.</p>
 <p>But what type of communication do we need to do ?</p>
-<p>As each GPU need to <em>gather</em> the updated model parameters from all the other GPUs. So, we need to do a <strong>All-Gather</strong> operation. And this is another communication primitive like <strong>All-Reduce</strong> which we have seen earlier.</p>
+<p>Each GPU needs to <em>gather</em> the updated model parameters from all the other GPUs. For this, we perform an <strong>All-Gather</strong> operation, which is another communication primitive similar to <strong>All-Reduce</strong> that we’ve seen earlier.</p>
 <p align="center">
 <img src="assets/all_gather.png" alt="All Gather" width="70%">
 </p>
-<p>Let’s quickly see an example of how to do this using <code>torch.distributed.all_gather()</code>. Here we are creating a tensor on each GPU and performing the <strong>All-Gather</strong> operation on them.</p>
+<p>Let’s quickly see an example of how to do this using <code>torch.distributed.all_gather()</code>. Here we are creating a tensor on each GPU and performing the <strong>All-Gather</strong> operation on these tensors.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-6-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-1" role="tab" aria-controls="tabset-6-1" aria-selected="true" href="">All-Gather Example</a></li></ul>
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-6-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-1" role="tab" aria-controls="tabset-6-1" aria-selected="true" href="">dist_all_gather.py</a></li></ul>
 <div class="tab-content">
 <div id="tabset-6-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-6-1-tab">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
@@ -1079,9 +1089,9 @@ The intermediate outputs from each neural network layer required to compute grad
 </div>
 </div>
 </div>
-<p>Just like before, we can run this code with 4 GPUs:</p>
+<p>Just like before, we can run this code with 4 GPUs using <code>torchrun</code>:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">torchrun</span> <span class="at">--nproc_per_node</span><span class="op">=</span>4 dist_all_gather.py</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Typical output:</p>
+<p>We will get the following output:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="ex">Before</span> all_gather on rank 2: tensor<span class="er">(</span><span class="ex">[3.,</span> 3., 3.], device=<span class="st">'cuda:2'</span><span class="kw">)</span></span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="ex">Before</span> all_gather on rank 0: tensor<span class="er">(</span><span class="ex">[1.,</span> 1., 1.], device=<span class="st">'cuda:0'</span><span class="kw">)</span></span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="ex">Before</span> all_gather on rank 1: tensor<span class="er">(</span><span class="ex">[2.,</span> 2., 2.], device=<span class="st">'cuda:1'</span><span class="kw">)</span></span>
@@ -1091,22 +1101,17 @@ The intermediate outputs from each neural network layer required to compute grad
 <span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="ex">After</span> all_gather on rank 1: [[1.0, 1.0, 1.0], [2.0, 2.0, 2.0], [3.0, 3.0, 3.0], [4.0, 4.0, 4.0]]</span>
 <span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a><span class="ex">After</span> all_gather on rank 2: [[1.0, 1.0, 1.0], [2.0, 2.0, 2.0], [3.0, 3.0, 3.0], [4.0, 4.0, 4.0]]</span>
 <span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a><span class="ex">After</span> all_gather on rank 3: [[1.0, 1.0, 1.0], [2.0, 2.0, 2.0], [3.0, 3.0, 3.0], [4.0, 4.0, 4.0]]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>With that, each GPU now has the updated model parameters and now they can start with the next batch and start the forward pass.</p>
+<p>With that, each GPU now has the updated model parameters. They can now begin the next batch, performing the forward pass with these updated parameters, allowing training to continue.</p>
 <p align="center">
 <img src="assets/zero-1_5.png" alt="ZeRO-1 Backward" width="100%">
 </p>
 <p>So, this is how ZeRO-1 strategy works.</p>
-<p>Now, if go back and carefully look after <em>All_Reduce</em> operation in ZeRO-1, each GPU discarded all the other gradients and kept only the one whose corresponding optimizer state is present on that particular GPU.</p>
-<p>Which makes us think, why we need to keep all the gradients in all the GPUs in the first place ? Why cant shard the gradients as well along with its corresponding optimizer state. And this is exactly what ZeRO-2 strategy does.</p>
+<p>Now, if go back and carefully look after <em>All_Reduce</em> operation in ZeRO-1, each GPU <strong>discarded</strong> all the other gradients and <strong>kept only</strong> the one whose corresponding optimizer state is present on that particular GPU.</p>
+<p>Which makes us think, why we need to keep all the gradients in all the GPUs in the first place ? Why can’t we shard the gradients as well along with its corresponding optimizer state? And this is exactly what ZeRO-2 strategy does.</p>
 </section>
 <section id="zero-2-sharding-gradients" class="level3">
-<h3 class="anchored" data-anchor-id="zero-2-sharding-gradients">ZeRO-2: Sharding Gradients</h3>
-<p>Let’s now walk through <strong>ZeRO-2</strong> using the same concrete, step-by-step approach.</p>
-<p>Recall our key question from ZeRO-1:</p>
-<blockquote class="blockquote">
-<p><em>After the All-Reduce, why keep all gradients on all GPUs? Can’t each GPU just hold the gradients it needs?</em></p>
-</blockquote>
-<p>That’s exactly what ZeRO-2 does, it further shards the gradients right alongside the optimizer state and master weights. So, each GPU now only needs to store the gradient shard corresponding to its optimizer state shard.</p>
+<h3 class="anchored" data-anchor-id="zero-2-sharding-gradients">ZeRO-2: Sharding <code>Gradients</code></h3>
+<p>With ZeRO-2, we further <strong>shard</strong> the <code>gradients</code> right alongside the <code>optimizer states</code>. So, each GPU now only needs to store the gradient shard <strong>corresponding</strong> to its optimizer state shard.</p>
 <p align="center">
 <img src="assets/zero-2.png" alt="ZeRO-2" width="100%">
 </p>
@@ -1149,12 +1154,12 @@ The intermediate outputs from each neural network layer required to compute grad
 </tr>
 </tbody>
 </table>
-<p>So, <strong>ZeRO-2 nearly doubles the maximum trainable model size compared to ZeRO-1</strong> (and over 7x compared to vanilla Data Parallelism).</p>
-<p>Let’s see how the communication overhead changes with ZeRO-2. For the forward pass, we <strong>don’t</strong> need to do any communication (like in ZeRO-1), as we have all the parameters in each GPU.</p>
+<p>So, <strong>ZeRO-2</strong> nearly doubles the maximum trainable model size compared to <strong>ZeRO-1</strong> (and over 7x compared to vanilla DP). Let’s see how the communication overhead changes with ZeRO-2.</p>
+<p>For the <code>forward pass</code>, we <strong>don’t</strong> need to do any communication (like in ZeRO-1), as we have all the parameters in each GPU.</p>
 <p align="center">
 <img src="assets/zero-2_1.png" alt="ZeRO-2 Backward" width="100%">
 </p>
-<p>Next in the backward pass, instead of performing an <strong>All-Reduce</strong> over the gradients, we only perform a <strong>Reduce-Scatter</strong> operation. Another communication primitive like <strong>All-Reduce</strong> and <strong>All-Gather</strong> which we have seen earlier.</p>
+<p>Next, in the <code>backward pass</code>, instead of performing an <strong>All-Reduce</strong> over the gradients, we perform a <strong>Reduce-Scatter</strong> operation. This is another communication primitive, similar to <strong>All-Reduce</strong> and <strong>All-Gather</strong>, which we encountered earlier.</p>
 <p align="center">
 <img src="assets/zero-2_2.png" alt="ZeRO-2 Backward" width="100%">
 </p>
@@ -1182,7 +1187,7 @@ The intermediate outputs from each neural network layer required to compute grad
 </div>
 <p>We can see how this works with an example.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
-<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-7-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-1" role="tab" aria-controls="tabset-7-1" aria-selected="true" href="">Reduce-Scatter Example</a></li></ul>
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-7-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-1" role="tab" aria-controls="tabset-7-1" aria-selected="true" href="">dist_reduce_scatter.py</a></li></ul>
 <div class="tab-content">
 <div id="tabset-7-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-7-1-tab">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
@@ -1212,9 +1217,9 @@ The intermediate outputs from each neural network layer required to compute grad
 </div>
 </div>
 </div>
-<p>Just like before, you can run this code with 4 GPUs:</p>
+<p>Just like before, we can run this code with 4 GPUs using <code>torchrun</code>:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="ex">torchrun</span> <span class="at">--nproc_per_node</span><span class="op">=</span>4 dist_reduce_scatter.py</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Typical output:</p>
+<p>We will get the following output:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="ex">Before</span> reduce_scatter on rank 0: [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0], [10.0, 11.0, 12.0]]</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="ex">Before</span> reduce_scatter on rank 1: [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0], [10.0, 11.0, 12.0]]</span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="ex">Before</span> reduce_scatter on rank 2: [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0], [10.0, 11.0, 12.0]]</span>
@@ -1224,20 +1229,22 @@ The intermediate outputs from each neural network layer required to compute grad
 <span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a><span class="ex">After</span> reduce_scatter on rank 1: [16.0, 20.0, 24.0]</span>
 <span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a><span class="ex">After</span> reduce_scatter on rank 2: [28.0, 32.0, 36.0]</span>
 <span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a><span class="ex">After</span> reduce_scatter on rank 3: [40.0, 44.0, 48.0]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Each rank starts with identical chunked inputs. After <code>reduce_scatter</code>, every rank gets the sum (across all ranks) of the <em>i-th chunk</em>, distributed such that rank 0 gets chunk 0’s sum, rank 1 gets chunk 1’s sum, etc.</p>
-<p>After <strong>Reduce-Scatter</strong> operation, each GPU now has the gradient shard corresponding to its optimizer state shard which it can use to update its model parameters.</p>
+<p>Each GPU starts with identical chunked inputs. After <code>reduce_scatter</code>, every GPU gets the sum (across all GPUs) of the <em>i-th chunk</em>, distributed such that GPU 0 gets chunk 0’s sum, GPU 1 gets chunk 1’s sum, etc.</p>
+<p>After <strong>Reduce-Scatter</strong> operation, each GPU now has the gradient shard corresponding to its optimizer state shard which it can use to update its respective model parameters.</p>
 <p align="center">
 <img src="assets/zero-2_3.png" alt="ZeRO-2 Backward" width="100%">
 </p>
-<p>And now, we need to communicate again, to get the updated model parameters on all the GPUs, as at this point each GPU has the updated model parameters only for its own shard of the optimizer state.</p>
+<p>At this stage, we need to communicate once more to share the updated model parameters across all GPUs. This is because, after applying local updates, each GPU holds the updated parameters only for its own optimizer state shard.</p>
 <p align="center">
 <img src="assets/zero-2_4.png" alt="ZeRO-2 Backward" width="100%">
 </p>
-<p>This is how ZeRO-2 strategy works. We have come a long way from the vanilla Data Parallelism to ZeRO-2, where we have reduced the memory footprint quite significantly, but can we further scale ? And this is exactly what ZeRO-3 strategy does.</p>
+<p>This is how ZeRO-2 strategy works.</p>
+<p>We have come a long way from the vanilla DP to ZeRO-2, where we have reduced the memory footprint quite significantly, but can we further scale ? Of course we can, and this is exactly what we do in ZeRO-3.</p>
 </section>
 <section id="zero-3-sharding-parameters" class="level3">
-<h3 class="anchored" data-anchor-id="zero-3-sharding-parameters">ZeRO-3: Sharding Parameters</h3>
-<p>ZeRO-3 is the most aggressive form of ZeRO, it shards all the static memory components: parameters, gradients, and optimizer states. So, each GPU now only needs to store the parameter shard corresponding to its optimizer state shard.</p>
+<h3 class="anchored" data-anchor-id="zero-3-sharding-parameters">ZeRO-3: Sharding <code>Parameters</code></h3>
+<p>ZeRO-3 is the most aggressive form of ZeRO, it shards (as you might have guessed, by now) all the static memory components: <code>parameters</code>, <code>gradients</code>, and <code>optimizer states</code>.</p>
+<p>So, each GPU now only needs to store the parameter shard corresponding to its optimizer state shard.</p>
 <p align="center">
 <img src="assets/zero-3.png" alt="ZeRO-3" width="100%">
 </p>
@@ -1270,7 +1277,7 @@ The intermediate outputs from each neural network layer required to compute grad
 <p><span class="math display">\[
 \text{Max Parameters (ZeRO-3, 64 GPUs)} = \frac{80~\text{GB}}{0.25~\text{bytes per param}} \approx 320~\text{billion parameters}
 \]</span></p>
-<p>Let’s put this all side-by-side:</p>
+<p>Let’s put this all side-by-side again:</p>
 <table class="caption-top table">
 <thead>
 <tr class="header">
@@ -1302,13 +1309,14 @@ The intermediate outputs from each neural network layer required to compute grad
 </tr>
 </tbody>
 </table>
-<p>As you can see, <strong>ZeRO-3/FSDP</strong> can 10x the maximum trainable model size compared to <strong>ZeRO-2</strong>, and over 60x compared to <strong>vanilla DP</strong>.</p>
-<p>Now, let’s see how the communication overhead changes with ZeRO-3. As the model parameters are now sharded, we have a problem, we can not do the forward pass without any communication, we need to do a <strong>All-Gather</strong> operation to first get the full model parameters on all the GPUs.</p>
+<p>As you can see, <strong>ZeRO-3/FSDP</strong> increases the maximum trainable model size by a factor of 10 compared to <strong>ZeRO-2</strong>, and by more than 60 times compared to <strong>vanilla DP</strong>.</p>
+<p>Now, let’s see how the communication overhead changes with ZeRO-3.</p>
+<p>As the model parameters are now sharded, we have a problem, we can not do the <code>forward pass</code> without any communication, we need to do a <strong>All-Gather</strong> operation to first get the full model parameters on all the GPUs.</p>
 <p align="center">
 <img src="assets/zero-3_1.png" alt="ZeRO-3 Forward" width="100%">
 </p>
-<p>But after the forward pass, we can <em>flush</em> the model parameters from memory, as we don’t need them anymore for the current forward pass (as we can see above). So, although it reduces the memory footprint, it introduces a communication overhead.</p>
-<p>Similarly in the backward pass, we need to gather the parameters as and when needed using <strong>All-Gather</strong> and then perform <strong>Reduce-Scatter</strong> operation to get the gradient shards on all the GPUs as we did in ZeRO-2.</p>
+<p>But after the <code>forward pass</code>, we can <em>flush</em> the model parameters from memory, as we don’t need them anymore for the current forward pass (as we can see above). So, although it reduces the memory footprint, it introduces a communication overhead.</p>
+<p>Similarly in the <code>backward pass</code>, we need to gather the parameters as and when needed using <strong>All-Gather</strong> and then perform <strong>Reduce-Scatter</strong> operation to get the gradient shards on all the GPUs as we did in ZeRO-2.</p>
 <p align="center">
 <img src="assets/zero-3_2.png" alt="ZeRO-3 Backward" width="100%">
 </p>
@@ -1322,26 +1330,31 @@ The intermediate outputs from each neural network layer required to compute grad
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>Let’s recap how communication and memory work with ZeRO-3. For the forward pass, since the parameters are fully sharded, we have to <strong>all-gather</strong> the weights whenever we need them, which gives us a communication cost of <span class="math inline">\(\Psi\)</span>. Because those parameters can be released from memory right after the forward usage, we have to all-gather again as needed in the backward pass, so we pay that <span class="math inline">\(\Psi\)</span> “tax” a second time. And just like ZeRO-2, we need a <strong>reduce-scatter</strong> for the gradients at the end of backward, which adds yet another <span class="math inline">\(\Psi\)</span> in communication cost. So in total, the communication bill per iteration comes out to <span class="math inline">\(3\Psi\)</span>, a bit higher than the <span class="math inline">\(2\Psi\)</span> we saw in ZeRO-2.</p>
-<p>On paper, this sounds like a lot of data being moved around, but in practice it’s not too scary! Thanks to <em>prefetching,</em> we can overlap these all-gather operations with computation. Typically, while we’re doing the forward for Layer <span class="math inline">\(n\)</span>, we can start all-gathering the parameters for Layer <span class="math inline">\(n+1\)</span> in parallel. Similarly, during the backward pass, we can prefetch the next set of weights needed. This overlap keeps things efficient as long as we aren’t cranking DP up to very large scales (as a rough guideline, keeping DP <span class="math inline">\(\leq\)</span> 512 is usually safe).</p>
+<p>Let’s recap how communication and memory work with ZeRO-3.</p>
+<p>For the <code>forward pass</code>, since the parameters are fully sharded, we have to <strong>all-gather</strong> the weights whenever we need them, which gives us a communication cost of <span class="math inline">\(\Psi\)</span>. Because those parameters can be released from memory right after the forward usage, we have to <strong>all-gather</strong> again as needed in the <code>backward pass</code>, so we pay that <span class="math inline">\(\Psi\)</span> “tax” a second time.</p>
+<p>And just like ZeRO-2, we need a <strong>reduce-scatter</strong> for the gradients at the end of <code>backward pass</code>, which adds yet another <span class="math inline">\(\Psi\)</span> in communication cost. So in total, the communication bill per iteration comes out to <span class="math inline">\(3\Psi\)</span>, a bit higher than the <span class="math inline">\(2\Psi\)</span> we saw in ZeRO-2.</p>
+<p>On paper, this sounds like a lot of data being moved around, but in practice it’s not too scary! Thanks to <strong>prefetching</strong>, we can overlap these all-gather operations with computation.</p>
+<p>Typically, while we’re doing the forward for Layer <span class="math inline">\(n\)</span>, we can start all-gathering the parameters for Layer <span class="math inline">\(n+1\)</span> in parallel.</p>
+<p>Similarly, during the <code>backward pass</code>, we can prefetch the next set of weights needed. This overlap keeps things efficient as long as we aren’t cranking DP up to very large scales (as a rough guideline, keeping DP <span class="math inline">\(\leq\)</span> 512 is usually safe).</p>
 <p>From the memory perspective, by sharding everything, we’ve boiled the formula down to its most compact form:</p>
 <p><span class="math display">\[
 \mathcal{M}_{\text{ZeRO-3}} = \frac{2\Psi + 2\Psi + 12\Psi}{N_d}
 \]</span> Increasing the DP group size keeps reducing per-GPU model memory, but activation memory still requires tricks like checkpointing and grad accumulation, which we discussed earlier.</p>
 </div>
 </div>
-<p>One important point that can be confusing at first: Even though ZeRO-1, ZeRO-2, and ZeRO-3 shard the model, they are all still types of <strong>Data Parallelism</strong>.</p>
-<p>Each GPU still processes the entire forward and backward pass of the model on its own batch of data, just like vanilla DP. The main difference is that <strong>ZeRO changes how the model’s parameters and related tensors are stored and managed across GPUs</strong>, which dramatically reduces memory usage but doesn’t change the core idea of Data Parallelism.</p>
+<p>One important point that can be confusing at first: Even though <strong>ZeRO-1</strong>, <strong>ZeRO-2</strong>, and <strong>ZeRO-3</strong> all shard the model, they are still forms of <strong>DP</strong>.</p>
+<p>Each GPU still processes the entire forward and backward pass of the model on its own batch of data, just like vanilla DP. The main difference is that <strong>ZeRO</strong> <code>changes</code> how the model’s <code>parameters</code> and <code>related tensors</code> are stored and managed across GPUs, which dramatically reduces memory usage but doesn’t change the core idea of <strong>DP</strong>.</p>
 <p align="center">
 <img src="assets/dp_summary.png" alt="DP Summary" width="100%">
 </p>
 </section>
 </section>
-<section id="introduction-to-ray---a-unified-ai-compute-engine" class="level1">
-<h1>Introduction to Ray - A Unified AI Compute Engine</h1>
-<p>Now that we’ve explored the ZeRO stages and different data parallel strategies, let’s discuss how to put these techniques into practice using Ray and PyTorch and, crucially, why Ray is such a good fit for large-scale distributed training in real-world settings.</p>
-<p>Until now, we’ve mostly focused on how to leverage multiple GPUs within a single machine. However, scaling up modern deep learning requires distributing the training job not just across several GPUs, but often across many different machines as well. This introduces a host of new challenges — from launching and configuring clusters, to monitoring jobs, handling failures, and minimizing the engineering overhead when scaling up and down.</p>
-<p>When moving to distributed training at scale, several key requirements and challenges emerge in practice:</p>
+<section id="introduction-to-ray---unified-ai-compute-engine" class="level1">
+<h1>Introduction to Ray - <code>Unified AI Compute Engine</code></h1>
+<p>Now that we’ve explored the <strong>ZeRO</strong> stages and different data parallel strategies, let’s discuss how to put these techniques into practice using <strong>Ray</strong> and <strong>PyTorch</strong> and, crucially, why <strong>Ray</strong> is such a good fit for large-scale distributed training in real-world settings.</p>
+<p>Until now, we’ve mostly focused on how to leverage multiple GPUs within a single machine. However, scaling up modern deep learning requires distributing the training job not just across several GPUs, but often across many different machines as well.</p>
+<p>This introduces a host of new challenges - from launching and configuring clusters, to monitoring jobs, handling failures, and minimizing the engineering overhead when scaling up and down.</p>
+<p>When moving to <strong>distributed training</strong> at scale, several key requirements and challenges emerge in practice:</p>
 <ul>
 <li><strong>Scalability and Speed:</strong> Training jobs should be able to leverage more GPUs and machines to finish faster, without painful setup.</li>
 <li><strong>Easy Infrastructure Management:</strong> We shouldn’t need to spend time manually setting up or configuring clusters, whether on cloud or on-premises resources.</li>
@@ -1349,16 +1362,17 @@ The intermediate outputs from each neural network layer required to compute grad
 <li><strong>Reliability and Fault Tolerance:</strong> Hardware failures, network issues, or preempted nodes shouldn’t force us to restart training from scratch—resilience and checkpointing are critical.</li>
 <li><strong>Minimal Code Changes:</strong> Adapting our code for distributed training shouldn’t require a major rewrite of training logic.</li>
 </ul>
-<p>Ray provides solutions for all of these requirements (and more), making it a compelling choice for large-scale distributed deep learning.</p>
-<p>This is why Ray is increasingly popular in the deep learning ecosystem. By abstracting away the pain points of distributed systems, Ray lets us scale from laptop to GPU cluster without major workflow changes or infrastructure headaches.</p>
-<p>In the sections that follow, we’ll see concrete code and recipes showing how easy Ray makes it to scale PyTorch training seamlessly, from simple data parallel jobs to advanced ZeRO and FSDP setups. But before that let’s spend some time to understand what Ray is and how it works.</p>
-<p><strong>Ray</strong> is an open-source, unified AI Compute Engine designed to scale Python applications, especially AI/ML workloads, from a single laptop to clusters with thousands of machines, all with minimal code changes. At the core of Ray is <strong>Ray Core</strong>, a low-level distributed computing framework featuring a simple, Pythonic API for building and scaling distributed applications.</p>
+<p><strong>Ray</strong> provides solutions for all of these requirements (and more), making it a compelling choice for large-scale distributed deep learning.</p>
+<p>By abstracting away the pain points of distributed systems, Ray lets us <code>scale</code> from laptop to GPU cluster without major workflow changes or infrastructure headaches.</p>
+<p>In the sections that follow, we’ll see concrete code and recipes showing how easy Ray makes it to scale PyTorch training seamlessly, from simple data parallel jobs to advanced ZeRO and FSDP setups. But before that let’s spend some time to understand what <strong>Ray</strong> is and how it works.</p>
+<p><strong>Ray</strong> is an open-source, unified AI Compute Engine designed to scale Python applications, especially AI/ML workloads, from a single laptop to clusters with thousands of machines, all with minimal code changes.</p>
+<p>At the core of <strong>Ray</strong> is <code>Ray Core</code>, a low-level distributed computing framework featuring a simple, Pythonic API for building and scaling any kind of distributed applications.</p>
 <p align="center">
 <img src="assets/ray_01.png" alt="Ray" width="100%">
 </p>
 <section id="ray-core-primitives" class="level2">
-<h2 class="anchored" data-anchor-id="ray-core-primitives"><code>Ray Core</code> Primitives</h2>
-<p>Ray Core provides a minimal, yet powerful set of primitives that let you upgrade normal Python code into distributed code with almost no friction.</p>
+<h2 class="anchored" data-anchor-id="ray-core-primitives">Ray Core Primitives</h2>
+<p><code>Ray Core</code> provides a minimal, yet powerful set of primitives that let you upgrade normal Python code into distributed code with almost no friction.</p>
 <p align="center">
 <img src="assets/ray_00.png" alt="Ray Core Primitives" width="100%">
 </p>
@@ -1372,7 +1386,7 @@ The intermediate outputs from each neural network layer required to compute grad
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong>Ray</strong> manages the tough parts (task scheduling, node failures, data transfers, etc.) under the hood, so you don’t have to. Basically, as an ML Engineer/Researcher, you can focus on your model and data, and Ray will take care of the rest (which in our case is the madness of distributed systems and distributed training).</p>
+<p><strong>Ray</strong> handles the difficult parts, like task scheduling, node failures, data transfers, and more behind the scenes so you don’t have to. As an ML engineer or researcher, you can focus on your model, algorithm, and data, while <strong>Ray</strong> takes care of the complexities of distributed systems and distributed training.</p>
 </div>
 </div>
 </section>
