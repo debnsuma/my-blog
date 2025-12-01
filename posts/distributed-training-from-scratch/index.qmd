@@ -1,8 +1,8 @@
 ---
 title: "Distributed Training From Scratch"
 author: "Suman Debnath"
-date: "2025-11-15"
-categories: [machine-learning, distributed-systems, deep-learning, ray]
+date: "2025-11-30"
+categories: [distributed-training, deep-learning, ray, pytorch]
 image: "assets/ray.jpg"
 toc: true
 description: "A comprehensive guide to understanding and implementing distributed training for deep learning models from first principles"
@@ -382,7 +382,7 @@ So, after the backward pass, we need to somehow synchronize the gradients across
 
 ### Gradient Synchronization: The All-Reduce Primitive
 
-Before we dive into the All-Reduce operation, it's important to note that NVIDIA provides a rich set of **communication primitives** as part of its distributed training ecosystem (such as NCCL). These primitives simplify and accelerate multi-GPU (and multi-node) communication, enabling efficient synchronization and sharding operations required for large-scale training.
+Before we dive into the All-Reduce operation, it's important to note that NVIDIA provides a rich set of **communication primitives** as part of its distributed training ecosystem such as NCCL(NVIDIA's collective communication library). These primitives simplify and accelerate multi-GPU (and multi-node) communication, enabling efficient synchronization and sharding operations required for large-scale training.
 
 ::: {.callout-note title="Communication Primitives in Distributed Training"}
 **All-Reduce** is just one such primitive—used specifically for synchronizing gradients across GPUs at the end of each backward pass in standard Data Parallel training. However, there are several other primitives (like **All-Gather**, **Reduce-Scatter**, **Broadcast**, etc.) designed for different patterns of communication and parallelism. We will encounter and discuss these additional primitives as we explore more advanced parallelization techniques (e.g., ZeRO, model sharding, tensor parallelism) later in the series.
@@ -907,5 +907,885 @@ Each GPU still processes the entire forward and backward pass of the model on it
 <p align="center">
   <img src="assets/dp_summary.png" alt="DP Summary" width="100%"/>
 </p>
+
+# Introduction to Ray - A Unified AI Compute Engine
+
+Now that we've explored the ZeRO stages and different data parallel strategies, let's discuss how to put these techniques into practice using Ray and PyTorch and, crucially, why Ray is such a good fit for large-scale distributed training in real-world settings.
+
+Until now, we've mostly focused on how to leverage multiple GPUs within a single machine. However, scaling up modern deep learning requires distributing the training job not just across several GPUs, but often across many different machines as well. This introduces a host of new challenges — from launching and configuring clusters, to monitoring jobs, handling failures, and minimizing the engineering overhead when scaling up and down.
+
+When moving to distributed training at scale, several key requirements and challenges emerge in practice:
+
+- **Scalability and Speed:** Training jobs should be able to leverage more GPUs and machines to finish faster, without painful setup.
+- **Easy Infrastructure Management:** We shouldn't need to spend time manually setting up or configuring clusters, whether on cloud or on-premises resources.
+- **Visibility and Monitoring:** It must be easy to track metrics, logs, and failures across all nodes, so debugging and monitoring don’t turn into a bottleneck.
+- **Reliability and Fault Tolerance:** Hardware failures, network issues, or preempted nodes shouldn't force us to restart training from scratch—resilience and checkpointing are critical.
+- **Minimal Code Changes:** Adapting our code for distributed training shouldn't require a major rewrite of training logic.
+
+Ray provides solutions for all of these requirements (and more), making it a compelling choice for large-scale distributed deep learning.
+
+This is why Ray is increasingly popular in the deep learning ecosystem. By abstracting away the pain points of distributed systems, Ray lets us scale from laptop to GPU cluster without major workflow changes or infrastructure headaches. 
+
+In the sections that follow, we'll see concrete code and recipes showing how easy Ray makes it to scale PyTorch training seamlessly, from simple data parallel jobs to advanced ZeRO and FSDP setups. But before that let's spend some time to understand what Ray is and how it works.
+
+**Ray** is an open-source, unified AI Compute Engine designed to scale Python applications, especially AI/ML workloads, from a single laptop to clusters with thousands of machines, all with minimal code changes. At the core of Ray is **Ray Core**, a low-level distributed computing framework featuring a simple, Pythonic API for building and scaling distributed applications.
+
+<p align="center">
+  <img src="assets/ray_01.png" alt="Ray" width="100%"/>
+</p>
+
+## `Ray Core` Primitives
+
+Ray Core provides a minimal, yet powerful set of primitives that let you upgrade normal Python code into distributed code with almost no friction. 
+
+<p align="center">
+  <img src="assets/ray_00.png" alt="Ray Core Primitives" width="100%"/>
+</p>
+
+::: {.callout-note title="Ray Compute Engine"}
+**Ray** manages the tough parts (task scheduling, node failures, data transfers, etc.) under the hood, so you don’t have to. Basically, as an ML Engineer/Researcher, you can focus on your model and data, and Ray will take care of the rest (which in our case is the madness of distributed systems and distributed training).
+:::
+
+## An example: For `Stateless` Tasks (Tasks)
+
+Let's try to understand the _core primitives_ of Ray, `tasks` and `actors` with an example. Imagine you’re building a simple app where you need to process a batch of images with a slow transformation (invert the colors). 
+
+At first, you write a `for-loop` to process the images sequentially. It works, but it’s sluggish, using only a single CPU core, even if your laptop has eight. What if you need to process hundreds or thousands of images? This is where **Ray** comes in, and a world of instant scalability. 
+
+Below, we walk step-by-step through the journey: from a plain, sequential Python function—painfully slow! to a parallel powerhouse processed by using Ray Tasks, and finally to coordinated, stateful parallelism with Ray Actors. 
+
+:::: {.panel-tabset}
+
+### Step 1. The Baseline: Sequential Processing
+
+We start at square one with a classic slow `for-loop`. Each image is processed one after another, burning a whole second per image. With 8 images, that's 8 seconds to process all the images.
+
+```python
+# sequential_process.py
+import time
+import numpy as np
+
+def process_image(image: np.ndarray) -> np.ndarray:
+    """Simulates a slow 1-second filter."""
+    time.sleep(1)
+    return 255 - image
+
+images = [np.random.randint(0, 255, (10, 10, 3)) for _ in range(8)]
+
+start_time = time.time()
+# Sequential: 8 images × 1 sec/image = 8 seconds
+results = [process_image(img) for img in images]
+end_time = time.time()
+
+print(f"Processed {len(results)} images in {end_time - start_time:.2f} seconds.")
+```
+Our code works, but only uses a single core, leaving the rest idle. Not a good situation. Let's try to parallelize it using `Ray Tasks`.
+
+### Step 2. Parallel Ray Task (Fast)
+
+Now, let's use Ray to parallelize the image processing. Ray's `@ray.remote` decorator instantly upgrades your function to run in parallel, one copy per available CPU core. By switching to `.remote()` calls, you launch as many parallel jobs as you have CPUs, and gather results with `ray.get()`.
+
+```python
+# parallel_process.py
+import ray
+import time
+import numpy as np
+
+# 1. Initialize Ray - autodetects & uses all available CPU cores
+ray.init()
+
+# 2. Decorate the function as a remote Ray task
+@ray.remote
+def process_image(image: np.ndarray) -> np.ndarray:
+    """Simulates a slow 1-second filter."""
+    time.sleep(1)
+    return 255 - image
+
+images = [np.random.randint(0, 255, (10, 10, 3)) for _ in range(8)]
+
+start_time = time.time()
+
+# 3. Launch tasks in parallel; returns list of ObjectRefs (futures)
+result_refs = [process_image.remote(img) for img in images]
+
+# 4. Wait for and retrieve finished results via ray.get()
+results = ray.get(result_refs)
+end_time = time.time()
+
+# On an 8-core machine: ~1 second total runtime!
+print(f"Processed {len(results)} images in {end_time - start_time:.2f} seconds.")
+
+ray.shutdown()
+```
+**What we did differently?**  
+
+- We decorated the function with `@ray.remote` decorator to make it a remote task.
+- We called the function with `.remote()` to launch it as a remote task.
+- We waited for the results with `ray.get()`.
+- The secret here is the `ObjectRef`: each `.remote()` call sends off a job in the background, while your main code keeps going. When you call `ray.get(result_refs)`, Ray assembles all results when they're ready.
+
+::::
+
+::: {.callout-tip title="Ray Speed-Up"}
+**By adding just `@ray.remote`, `.remote()`, and `ray.get()`, we get a nearly 8x speedup with 8 CPU cores.**
+:::
+
+## Going Further: For `Stateful` Tasks (Actors)
+
+The beauty of Ray is that it doesn’t just parallelize our work, it also gives us the right tool for **sharing state across those jobs**. Imagine that you want a running tally (say, the total number of pixels processed across all images), but you can’t use a global variable, because each parallel job runs isolated.
+
+What you really want is a service: _a live, remote counter_ that all jobs can update in real-time. That’s what is known as an `Actor` in Ray: a class with its own persistent state, living somewhere on the cluster. 
+
+Let's see how to create and use an Actor.
+
+:::: {.panel-tabset}
+
+### Ray Actor (Stateful)
+
+```python
+# actor_counter.py
+import ray
+import numpy as np
+import time
+
+ray.init()
+
+# 1. Define the stateful service as a Python Class
+@ray.remote
+class PixelCounter:
+    # The internal state is defined in __init__
+    def __init__(self):
+        self.total_pixels = 0
+
+    # A method to mutate (update) the internal state
+    def add(self, num_pixels: int):
+        self.total_pixels += num_pixels
+
+    # A method to retrieve the internal state
+    def get_total(self) -> int:
+        return self.total_pixels
+
+# 2. Modify the Task to use the Actor Handle
+@ray.remote
+def process_image_with_actor(image: np.ndarray, counter_actor: "ActorHandle"):
+    # This task calls the Actor's add method remotely
+    counter_actor.add.remote(image.size)
+    time.sleep(1)
+    # The image processing logic is here, but omitted for simplicity
+
+# --- Main Script ---
+images = [np.random.randint(0, 255, (10, 10, 3)) for _ in range(8)]
+image_size = images[0].size
+expected_total = image_size * len(images) # 8 * 300 = 2400
+
+# 3. Create a single instance (the Actor Handle)
+counter = PixelCounter.remote()
+
+# 4. Launch 8 parallel tasks, passing the Actor Handle to each
+task_refs = [process_image_with_actor.remote(img, counter) for img in images]
+
+# Wait for all the image processing tasks to complete
+ray.get(task_refs)
+
+# 5. Retrieve the final state from the Actor
+final_total_ref = counter.get_total.remote()
+final_total = ray.get(final_total_ref)
+
+print(f"Expected total pixels: {expected_total}")
+print(f"Actual total from actor: {final_total}")
+
+ray.shutdown()
+```
+
+**What we did differently?** 
+
+- Our stateless Ray Tasks each process an image, but the Actor (the remote `PixelCounter` class) lives on, safely tallying up the total pixel count as tasks report in.
+- The Actor’s state persists across many requests, letting you coordinate and aggregate information even in a distributed, parallel environment.
+- The only change from earlier?  
+  - Define a `@ray.remote` class (`PixelCounter`).
+  - Pass its handle to your tasks so they can call `add.remote()`.
+
+::::
+
+This pattern of combining **Ray Tasks** for stateless (think of Python functions), independent work and **Ray Actors** (think of Python classes) for shared state, is the foundation of scalable Python pipelines for any real-world application (not just any AI applications). And we can build anything with this and make it scalable.
+
+Ray's primitives empower us to build scalable, reliable, and maintainable distributed applications, without rewriting all our code or micro-managing threads and processes.
+
+## Ray for Different AI Workloads
+
+While Ray Core provides the low-level primitives for building distributed applications, it is not the only or always the best option, especially for **specialized AI workloads**. That's why Ray offers higher-level abstractions tailored to specific AI tasks like **data processing, training, hyperparameter search, RL and model serving**. 
+
+Ray provides advanced AI Libraries such as:
+
+| Ray Library | Purpose | Key Features / Benefits |
+|:---|:---|:---|
+| `Ray Data` | `Scalable Data Ingest, Processing, Inference` | Effortlessly shards and preprocesses massive datasets; streams data efficiently between CPUs (ETL) and GPUs (training/inference) to maximize hardware utilization. |
+| `Ray Train` | `Distributed Training & Fine-Tuning` | Abstracts away multi-node/GPU orchestration and synchronization for PyTorch, TensorFlow, etc., without the need for boilerplate or manual sync. |
+| `Ray Tune` | `Scalable Hyperparameter Search` | Coordinates and manages hyperparameter trials (search, early stopping, scheduling) across a cluster; includes experiment tracking and best-model picking. |
+| `Ray Serve` | `Fast, Programmable Model Serving` | Deploys models and logic as microservices with auto-scaling; supports model composition and features like traffic splitting and versioning. |
+| `Ray RLlib` | `Scalable Reinforcement Learning` | Provides a comprehensive library for training and evaluating RL algorithms. |                                                                      |
+
+These libraries are built on top of `Ray Core` and offer a more user-friendly interface for building distributed applications. 
+
+::: {.callout-tip title="Why Use Higher-Level Ray Libraries?"}
+If Ray Core’s Tasks and Actors are this powerful, why bother with higher-level Ray libraries like Ray Train or Ray Data?
+
+The answer: **Abstraction and Specialization**. While it’s technically possible to build a full distributed training pipeline with only Ray Core, that approach means you shoulder all the complexities—manual data sharding, synchronization (e.g., for PyTorch DDP), distributed checkpointing, fault tolerance, handling resuming, and hyperparameter search. That’s a lot of boilerplate and risk!
+:::
+
+Not only that it also have tight integration with popular frameworks like `PyTorch`, `vLLM`, `Hugging Face`, and more.
+
+<p align="center">
+  <img src="assets/ray_02.png" alt="Ray" width="100%"/>
+</p>
+
+This unified ecosystem empowers us to build end-to-end distributed AI workflows. Every component from ingest to training to serving, scales seamlessly from our laptop to a full cluster. 
+
+In this blog, we’ll focus on distributed training with `Ray Train`, showing how it can scale our PyTorch training from a single GPU to a full cluster almost effortlessly.
+
+::: {.callout-warning title="Why Not Use Only PyTorch Distributed?"}
+
+While **PyTorch Distributed** (such as DDP) is an excellent built-in solution for multi-GPU training, it's primarily designed for *single-node* or *homogeneous, tightly-coupled clusters*. If you're just scaling to multiple GPUs on one machine, PyTorch's distributed tools are often enough. And you can run your training job with `torchrun` command.
+
+However, **the challenges multiply dramatically the moment you want to scale across several machines or need to orchestrate complex workflows**. Tasks like:
+
+- Launching jobs and synchronizing them across machines,
+- Managing different workers, node failures, and resuming or monitoring experiments,
+- Efficiently using both CPUs (for pre-processing and data loading) and GPUs (for training/inference) in one seamless workflow,
+- Sharding and streaming large datasets not just for one epoch, but for repeated, distributed, and fault-tolerant training,
+
+become **painful and complex** with only PyTorch’s stock tools. 
+
+This is exactly where **Ray shines**.  
+
+It's abstracts away the low-level engineering required to run distributed workloads at scale. For instance, with **Ray Train** and **Ray Data**, you get seamless multi-GPU, multi-node orchestration, unified CPU-GPU pipelines, resilience and scalability. This helps you focus on your algorithms and models, rather than the underlying infrastructure. 
+
+:::
+
+# Distributed Training with Ray Train and PyTorch 
+
+Now that we have understood the basics of Ray and how it can help us scale any application, let's now dive deep into distributed training with Ray Train and PyTorch. 
+
+<p align="center">
+  <img src="assets/ray_03.png" alt="Distributed Training with Ray Train and PyTorch" width="100%"/>
+</p>
+
+Before diving into distributed training, let's establish a baseline by looking at a simple single-GPU training loop. This will help us understand what needs to change when we migrate to distributed training.
+
+Before we dive into distributed training, let's first look at a **simple, single-GPU PyTorch training loop** as our baseline. This example will help ground the core steps that appear in almost any deep learning project, and by keeping things simple (no distributed libraries, no argument parsing), we make it crystal clear what needs to change later for multi-GPU or multi-node scaling.
+
+## Single-GPU PyTorch Training on CIFAR-10
+
+We'll use a modern Vision Transformer model (`torchvision.models.VisionTransformer`) and the CIFAR-10 dataset. This code works on CPU, GPU (CUDA), or Apple MPS — but it's strictly ordinary, non-distributed PyTorch.
+
+If you have trained any model with PyTorch on a single machine, you might have seen a similar training loop. The standard way to train a model with PyTorch on a single machine (single GPU) consists of these steps:
+
+1. Download and prepare the `dataset`
+    - Set up `data loaders`
+2. Define the `model` 
+    - Move the model to the available device (GPU, MPS, or CPU).
+3. Set up `optimizer` and `loss`.
+4. Run the `training loop`.
+    - Iterate over training data to update model weights.
+    - Check accuracy on validation data.
+5. Optionally, `checkpoint` the model at the end.
+
+This works perfectly for *one GPU or a single machine*, but doesn't scale automatically. We'll see soon how to migrate this to Ray Train for scaling, but for now, here's the basic setup.
+
+### DataLoader Function
+
+This function sets up the [DataLoaders](https://pytorch.org/docs/stable/data.html) for the CIFAR-10 training and test splits. Note: We use a `FileLock` to avoid concurrency issues if datasets are being downloaded.
+
+```python
+from torchvision import datasets, transforms
+from torchvision.transforms import Normalize, ToTensor
+from torch.utils.data import DataLoader
+from filelock import FileLock
+import os
+
+def get_dataloaders(batch_size):
+    """
+    Create standard PyTorch DataLoaders.
+    No distributed code — just vanilla PyTorch.
+    """
+
+    transform = transforms.Compose([
+        ToTensor(),
+        Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
+
+    with FileLock(os.path.expanduser("~/data.lock")):
+        train_data = datasets.CIFAR10(
+            root="~/data", train=True, download=True, transform=transform,
+        )
+        test_data = datasets.CIFAR10(
+            root="~/data", train=False, download=True, transform=transform,
+        )
+
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(test_data, batch_size=batch_size)
+
+    return train_loader, test_loader
+```
+
+### Training Function
+
+This is the standard PyTorch training loop, using `torchvision.models.VisionTransformer`. 
+
+```python
+from torchvision.models import VisionTransformer
+from torch import nn
+import torch
+from tqdm import tqdm
+
+def train_func(lr=1e-3, epochs=10, batch_size=512):
+    """
+    Main training function: single machine, single GPU.
+    """
+    # Get data loaders
+    train_loader, val_loader = get_dataloaders(batch_size=batch_size)
+
+    # Create the model
+    model = VisionTransformer(
+        image_size=32,   # CIFAR-10 images are 32x32
+        patch_size=4,    # Reasonable patch size for CIFAR-10
+        num_layers=12,   # Transformer layers
+        num_heads=8,     # Attention heads
+        hidden_dim=384,  # Model width
+        mlp_dim=768,     # Transformer MLP dim
+        num_classes=10   # CIFAR-10
+    )
+
+    # Move model to correct device (GPU/MPS/CPU)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
+    print(f"Using device: {device}")
+    model.to(device)
+
+    # Set up loss and optimizer
+    loss_fn = nn.CrossEntropyLoss()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-2)
+
+    # Training loop
+    for epoch in range(epochs):
+        print(f"\nEpoch {epoch + 1}/{epochs}")
+
+        # Training phase
+        model.train()
+        train_loss = 0.0
+        for X, y in tqdm(train_loader, desc=f"Train Epoch {epoch + 1}"):
+            X, y = X.to(device), y.to(device)
+            pred = model(X)
+            loss = loss_fn(pred, y)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            train_loss += loss.item()
+        train_loss /= len(train_loader)
+
+        # Validation phase
+        model.eval()
+        val_loss, num_correct, num_total = 0, 0, 0
+        with torch.no_grad():
+            for X, y in tqdm(val_loader, desc=f"Valid Epoch {epoch + 1}"):
+                X, y = X.to(device), y.to(device)
+                pred = model(X)
+                loss = loss_fn(pred, y)
+                val_loss += loss.item()
+                num_total += y.shape[0]
+                num_correct += (pred.argmax(1) == y).sum().item()
+        val_loss /= len(val_loader)
+        accuracy = num_correct / num_total
+
+        print(f"  Train Loss: {train_loss:.4f} | Valid Loss: {val_loss:.4f} | Accuracy: {accuracy:.4f} ({100 * accuracy:.2f}%)")
+
+    # Optional: Save checkpoint
+    checkpoint = {
+        'epoch': epochs,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'accuracy': accuracy,
+    }
+    torch.save(checkpoint, 'checkpoint_single_machine.pth')
+    print(f"\nTraining completed! Final accuracy: {100 * accuracy:.2f}%\nCheckpoint saved to checkpoint_single_machine.pth")
+```
+
+### Training the Model
+Let's now train the model on a single GPU.
+
+```python
+train_func(lr=1e-3, epochs=10, batch_size=512)
+```
+
+<p align="center">
+  <img src="assets/gpu_01.png" alt="Training the Model" width="100%"/>
+</p>
+
+As you can see, the model is trained on a single GPU while other GPUs are idle. 
+
+This script represents *plain vanilla* PyTorch, suitable for a single GPU or single CPU. There is no distributed logic or Ray involved yet. All of the key logic, especially the `get_dataloaders` function and the structure of the `train_func` will remain mostly the same when we migrate to distributed training with Ray Train!  
+
+Let's now train the model at scale on multiple GPUs across multiple machines.
+
+
+## Distributed Training with Ray Train
+
+Now, let's see how to migrate this `single-machine, single-GPU` training loop to `distributed training` using Ray Train and PyTorch on `multiple machines, multiple GPUs`. 
+
+<p align="center">
+  <video controls width="700">
+    <source src="assets/ray_train_01.mov" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+  <br>
+  <em>Distributed Training with Ray Train Key Concepts.</em>
+</p>
+
+### Ray Train Architecture  
+
+Ray Train's architecture is based on the following components:  
+1. A Ray Train Controller/Driver that schedules the training workers, handles errors, and manages checkpoints  
+2. Ray Train Workers that execute the training code
+
+<p align="center">
+  <img src="assets/ray_train_01.png" loading="lazy" width="700"/>
+</p>
+
+Below are the key API concepts of Ray Train:
+
+1. `train_loop_per_worker`: The core function that contains your model training logic  
+2. `ScalingConfig`: Specifies the number of workers and compute resources (CPUs, GPUs, TPUs)  
+3. `Trainer`: Manages the training process  
+4. `Trainer.fit()`: Starts the distributed training job
+
+<p align="center">
+  <img src="assets/ray_train_02.png" width="700" loading="lazy"/>
+</p>
+
+### Ray Data + Ray Train Integration
+
+Here is a diagram showing the Ray Data and Ray Train integration.
+
+<p align="center">
+  <img src="assets/ray_train_03.png" width="800" loading="lazy"/>
+</p>
+
+We are not going to go into the details of Ray Data and Ray Train integration in this post. But if you are interested in learning more about it, you can check out the [Ray Data](https://docs.ray.io/en/latest/data/index.html) and [Ray Train](https://docs.ray.io/en/latest/train/index.html) documentation.
+
+
+## Setup the Environment
+
+To check how many GPUs (and CPUs) are available in your Ray cluster, you can use the script below:
+
+::: {.panel-tabset}
+
+### Check Cluster GPUs
+
+```python
+import ray
+import torch
+
+def check_cluster_gpus():
+    """Check GPU count in the entire Ray cluster."""
+    # Initialize Ray if not already initialized
+    if not ray.is_initialized():
+        ray.init()
+
+    # Get cluster resources (total GPUs in cluster)
+    cluster_resources = ray.cluster_resources()
+    total_gpus = cluster_resources.get("GPU", 0)
+
+    # Get available resources (currently available GPUs)
+    available_resources = ray.available_resources()
+    available_gpus = available_resources.get("GPU", 0)
+
+    # Get local GPU count (GPUs on this node only)
+    local_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 0
+
+    # Print results
+    print("\n" + "="*60)
+    print("Ray Cluster GPU Information")
+    print("="*60)
+    print(f"Total GPUs in cluster:     {int(total_gpus)}")
+    print(f"Available GPUs in cluster: {int(available_gpus)}")
+    print(f"Local GPUs (head node):    {local_gpus}")
+    print("="*60)
+
+    # Additional cluster info
+    print("\nCluster Resources:")
+    print(f"  CPUs (total):     {int(cluster_resources.get('CPU', 0))}")
+    print(f"  CPUs (available): {int(available_resources.get('CPU', 0))}")
+
+    # Show node details if available
+    try:
+        nodes = ray.nodes()
+        print(f"\nCluster Nodes: {len(nodes)}")
+        for i, node in enumerate(nodes):
+            node_resources = node.get('Resources', {})
+            node_gpus = node_resources.get('GPU', 0)
+            print(f"  Node {i+1}: {int(node_gpus)} GPU(s)")
+    except Exception as e:
+        print(f"\nNote: Could not retrieve node details: {e}")
+
+    print()
+    return {
+        'total_gpus': int(total_gpus),
+        'available_gpus': int(available_gpus),
+        'local_gpus': local_gpus
+    }
+
+if __name__ == '__main__':
+    check_cluster_gpus()
+```
+:::
+
+As you can see, the cluster which I have has a total of 8 GPUs. The cluster consists of a total of one Head Node and two Worker Nodes, where each worker node has 4 GPUs each.
+
+```bash
+============================================================
+Ray Cluster GPU Information
+============================================================
+Total GPUs in cluster:     8
+Available GPUs in cluster: 8
+Local GPUs (head node):    0
+============================================================
+
+Cluster Resources:
+  CPUs (total):     96
+  CPUs (available): 96
+
+Cluster Nodes: 3
+  Node 1: 0 GPU(s)
+  Node 2: 4 GPU(s)
+  Node 3: 4 GPU(s)
+```
+## Distributed Training with Ray Train and PyTorch FSDP
+
+Now that we have understood the basics of Ray Train, and also have a Ray cluster ready, let's now dive into distributed training with Ray Train and PyTorch FSDP.
+
+### 1. Specify Cluster Scaling
+
+First, set up how many Ray workers (processes) will participate—typically one per GPU. For a Ray cluster with 8 GPUs:
+
+```python
+scaling_config = ScalingConfig(
+    num_workers=8,  # e.g., 8 GPUs in your cluster
+    use_gpu=True,
+    resources_per_worker={"CPU": 2, "GPU": 1},
+)
+```
+
+### 2. Data Preparation: PyTorch DataLoaders
+
+Data preparation is unchanged from typical PyTorch or DDP usage. Use your usual transforms and DataLoader logic:
+
+```python
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader
+from filelock import FileLock
+import os
+
+def get_dataloaders(batch_size):
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    ])
+    with FileLock(os.path.expanduser("~/data.lock")):
+        train_ds = datasets.CIFAR10("~/data", train=True, download=True, transform=transform)
+        valid_ds = datasets.CIFAR10("~/data", train=False, download=True, transform=transform)
+    return (
+        DataLoader(train_ds, batch_size=batch_size, shuffle=True),
+        DataLoader(valid_ds, batch_size=batch_size),
+    )
+```
+
+No special considerations are needed for FSDP at this stage.
+
+### 3. Define the Training Function
+
+Define your Ray Train worker function to train the model. This is the training function that will be executed by each worker. As the model is now being prepared for FSDP, we need to use the `prepare_model` function to prepare the model for FSDP. 
+
+```python
+import os
+import torch
+from torch import nn
+from torchvision.models import VisionTransformer
+import ray
+import tempfile
+
+def train_func_per_worker(config):
+    lr = config["lr"]
+    epochs = config["epochs"]
+    batch_size = config["batch_size_per_worker"]
+
+    ctx = ray.train.get_context()
+    rank = ctx.get_world_rank()
+    world_size = ctx.get_world_size()
+
+    if rank == 0:
+        print(f"Training with FSDP across {world_size} workers...")
+
+    # Prepare DataLoaders for distributed training
+    train_dl, valid_dl = get_dataloaders(batch_size)
+    train_dl = ray.train.torch.prepare_data_loader(train_dl)
+    valid_dl = ray.train.torch.prepare_data_loader(valid_dl)
+
+    # Define the model
+    model = VisionTransformer(
+        image_size=32, patch_size=4,
+        num_layers=12, num_heads=8, hidden_dim=384, mlp_dim=768, num_classes=10,
+    )
+
+    # Prepare the model for FSDP
+    model = ray.train.torch.prepare_model(model, parallel_strategy="fsdp")
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-2)
+
+    for epoch in range(epochs):
+        model.train()
+        total_loss, sample_cnt = 0.0, 0
+        for X, y in train_dl:
+            pred = model(X)
+            loss = criterion(pred, y)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item() * X.shape[0]
+            sample_cnt += X.shape[0]
+        train_loss = total_loss / sample_cnt
+
+        # Validation loop
+        model.eval()
+        valid_loss, correct, total = 0.0, 0, 0
+        with torch.no_grad():
+            for X, y in valid_dl:
+                pred = model(X)
+                valid_loss += criterion(pred, y).item() * X.shape[0]
+                total += y.shape[0]
+                correct += (pred.argmax(dim=1) == y).sum().item()
+        valid_loss /= total
+        acc = correct / total
+
+        if rank == 0:
+            print(f"Epoch {epoch+1}: Train Loss={train_loss:.4f} Valid Loss={valid_loss:.4f} Acc={acc:.3%}")
+
+        metrics = {"epoch": epoch+1, "train_loss": train_loss, "valid_loss": valid_loss, "accuracy": acc}
+        # Checkpoint every 5 epochs
+        if (epoch + 1) % 5 == 0:
+            with tempfile.TemporaryDirectory() as ckpt_dir:
+                torch.save(model.module.state_dict(), os.path.join(ckpt_dir, "model.pt"))
+                ray.train.report(metrics, checkpoint=ray.train.Checkpoint.from_directory(ckpt_dir))
+        else:
+            ray.train.report(metrics)
+```
+
+::: {.callout-note title="Change the parallel strategy to DDP"}
+To change the parallel strategy to DDP, simply change the parameter to `"ddp"`:
+```python
+model = ray.train.torch.prepare_model(model, parallel_strategy="fsdp")
+```
+:::
+
+### 4. Configure Run Checkpointing and Storage
+
+Use Ray's checkpointing utilities to save the best results and recoverable states:
+
+```python
+from ray.train import RunConfig, CheckpointConfig
+
+checkpoint_config = CheckpointConfig(
+    num_to_keep=2,
+    checkpoint_score_attribute="accuracy",
+    checkpoint_score_order="max",
+)
+run_config = RunConfig(
+    name="cifar10_fsdp_example",
+    storage_path="/mnt/cluster_storage/training/",  # Use a persistent/shared location
+    checkpoint_config=checkpoint_config,
+)
+```
+
+### 5. Launch Training with TorchTrainer
+
+Bring all the configs together and kick off distributed training:
+
+```python
+from ray.train.torch import TorchTrainer
+
+global_batch_size = 1024
+num_workers = 8   
+batch_size_per_worker = global_batch_size // num_workers
+
+train_loop_config = {
+    "lr": 1e-3,
+    "epochs": 20,
+    "batch_size_per_worker": batch_size_per_worker,
+}
+
+trainer = TorchTrainer(
+    train_loop_per_worker=train_func_per_worker,
+    train_loop_config=train_loop_config,
+    scaling_config=scaling_config,
+    run_config=run_config,
+)
+
+print("Starting FSDP distributed training...")
+result = trainer.fit()
+```
+
+### 6. Load and Use Checkpoints
+
+Our model can be restored from the best checkpoint after training:
+
+```python
+import torch
+from torchvision.models import VisionTransformer
+import os
+
+ckpt = result.checkpoint
+with ckpt.as_directory() as ckpt_dir:
+    model_path = os.path.join(ckpt_dir, "model.pt")
+    model = VisionTransformer(
+        image_size=32, patch_size=4,
+        num_layers=12, num_heads=8, hidden_dim=384, mlp_dim=768, num_classes=10,
+    )
+    state_dict = torch.load(model_path, map_location="cpu")
+    model.load_state_dict(state_dict)
+```
+
+Here is the complete code for the training script:
+
+::: {.panel-tabset}
+
+## train_fsdp.py
+
+```python
+import os
+import tempfile
+import torch
+from torch import nn
+from torchvision import datasets, transforms
+from torchvision.models import VisionTransformer
+from torch.utils.data import DataLoader
+from filelock import FileLock
+import ray
+from ray.train import ScalingConfig, RunConfig, CheckpointConfig
+from ray.train.torch import TorchTrainer
+
+def get_dataloaders(batch_size):
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
+    with FileLock(os.path.expanduser("~/data.lock")):
+        train_data = datasets.CIFAR10(root="~/data", train=True, download=True, transform=transform)
+        valid_data = datasets.CIFAR10(root="~/data", train=False, download=True, transform=transform)
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    valid_loader = DataLoader(valid_data, batch_size=batch_size)
+    return train_loader, valid_loader
+
+def train_func_per_worker(config):
+    lr = config["lr"]
+    epochs = config["epochs"]
+    batch_size = config["batch_size_per_worker"]
+
+    ctx = ray.train.get_context()
+    world_size = ctx.get_world_size()
+    local_rank = ctx.get_world_rank()
+    if local_rank == 0:
+        print(f"FSDP Training on {world_size} workers")
+
+    train_loader, valid_loader = get_dataloaders(batch_size)
+    train_loader = ray.train.torch.prepare_data_loader(train_loader)
+    valid_loader = ray.train.torch.prepare_data_loader(valid_loader)
+
+    model = VisionTransformer(
+        image_size=32, patch_size=4,
+        num_layers=12, num_heads=8, hidden_dim=384, mlp_dim=768, num_classes=10,
+    )
+    # [FSDP] Key change from DDP:
+    model = ray.train.torch.prepare_model(model, parallel_strategy="fsdp")
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-2)
+
+    for epoch in range(epochs):
+        model.train()
+        train_loss, n = 0.0, 0
+        for X, y in train_loader:
+            pred = model(X)
+            loss = criterion(pred, y)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            train_loss += loss.item() * X.shape[0]
+            n += X.shape[0]
+        train_loss /= n
+
+        model.eval()
+        correct, total, valid_loss = 0, 0, 0.0
+        with torch.no_grad():
+            for X, y in valid_loader:
+                pred = model(X)
+                valid_loss += criterion(pred, y).item() * X.shape[0]
+                total += y.shape[0]
+                correct += (pred.argmax(dim=1) == y).sum().item()
+        valid_loss /= total
+        accuracy = correct / total
+        metrics = {
+            "epoch": epoch + 1,
+            "train_loss": train_loss,
+            "valid_loss": valid_loss,
+            "accuracy": accuracy
+        }
+        # Save a checkpoint every 5 epochs
+        if (epoch + 1) % 5 == 0:
+            with tempfile.TemporaryDirectory() as tmp_ckpt_dir:
+                torch.save(model.module.state_dict(),
+                           os.path.join(tmp_ckpt_dir, "model.pt"))
+                ray.train.report(metrics, checkpoint=ray.train.Checkpoint.from_directory(tmp_ckpt_dir))
+        else:
+            ray.train.report(metrics)
+
+scaling_config = ScalingConfig(num_workers=8, use_gpu=True, resources_per_worker={"CPU": 2, "GPU": 1})
+checkpoint_config = CheckpointConfig(num_to_keep=2, checkpoint_score_attribute="accuracy", checkpoint_score_order="max")
+run_config = RunConfig(name="cifar10_fsdp_example", storage_path="/mnt/cluster_storage/training/", checkpoint_config=checkpoint_config)
+
+global_batch_size = 1024
+batch_size_per_worker = global_batch_size // scaling_config.num_workers
+train_loop_config = {"lr": 1e-3, "epochs": 20, "batch_size_per_worker": batch_size_per_worker}
+
+trainer = TorchTrainer(
+    train_loop_per_worker=train_func_per_worker,
+    train_loop_config=train_loop_config,
+    scaling_config=scaling_config,
+    run_config=run_config,
+)
+
+result = trainer.fit()
+```
+:::
+
+While the training is runing, we can see the progress in the Ray dashboard. We can now see that all 8 GPUs are being used for training.
+
+<p align="center">
+    <img src="assets/gpu_02.png" alt="Ray Train FSDP Dashboard" width="100%">
+</p>
+
+## Conclusion
+
+Distributed training from scratch can be daunting, but modern frameworks like Ray Train, combined with PyTorch features such as Fully Sharded Data Parallel (FSDP), make scalable and efficient training approachable and practical. We demonstrated how to set up a distributed pipeline for finetuning a model on multiple GPUs using Ray Train and PyTorch FSDP. 
+
+Leveraging Ray's abstractions, you can efficiently utilize your compute resources, monitor experiments, and scale training seamlessly. If you need to push scalability further, techniques such as Pipeline Parallelism, Tensor Parallelism, and Sequence Parallelism can be explored, each offering unique benefits for even larger model and data workloads.
+
+## References & Further Resources
+
+- [Ray Train Documentation](https://docs.ray.io/en/latest/train/index.html)
+- [PyTorch Distributed FSDP](https://pytorch.org/docs/stable/fsdp.html)
+- [Ray AIR: Scalable ML on Ray](https://docs.ray.io/en/latest/ray-air/getting-started.html)
+- [Train Deep Learning Models with Ray](https://docs.ray.io/en/latest/train/dl_guide.html)
+- [PyTorch Distributed Overview](https://pytorch.org/tutorials/beginner/dist_overview.html)
+- [DeepSpeed: High-Performance Deep Learning Optimization Library](https://www.deepspeed.ai/)
+- [Ray Data for Large-Scale Data Ingestion & Preprocessing](https://docs.ray.io/en/latest/data/index.html)
 
 

@@ -31,5 +31,8 @@
   },
   "posts/distributed-training-from-scratch/temp.md": {
     "temp.html": "89f8bbc2"
+  },
+  "posts/distributed-training-from-scratch/assets/Ray_Train.ipynb": {
+    "Ray_Train.html": "0014e12b"
   }
 }
