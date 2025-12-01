@@ -1863,7 +1863,7 @@ While the training is runing, we can see the progress in the Ray dashboard. We c
     <img src="assets/gpu_02.png" alt="Ray Train FSDP Dashboard" width="100%">
 </p>
 
-## Conclusion
+# Conclusion
 
 Distributed training from scratch is often perceived as a complex and challenging endeavor, especially when it comes to configuring multiple GPUs and orchestrating communication between workers. However, modern open-source frameworks such as **Ray Train**, together with robust PyTorch features like **FSDP**, have significantly lowered the barrier to scalable, efficient distributed deep learning. In this blog, we walked through a step-by-step workflow for setting up a distributed training pipeline to fine-tune a model on multiple GPUs, leveraging Ray Train for orchestration and PyTorch FSDP for efficient memory and communication management.
 
@@ -1873,7 +1873,7 @@ In this blog, we mostly talk about `Data Parallelism (DP)` technique for scaling
 
 Emerging practices in hybrid sharding, mixed precision, model offloading, and asynchronous optimization further push the boundaries of what is possible, empowering researchers and engineers to experiment at ever-increasing scales while managing resource and memory efficiency. Maybe in some future blog, we will discuss these advanced techniques in more detail (as I learn them :)).
 
-## References & Further Resources
+# References
 
 - Anyscale and Ray
   - [Getting Started with Ray on Anyscale](https://console.anyscale.com/register/v2)

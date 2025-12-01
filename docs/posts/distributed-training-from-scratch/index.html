@@ -284,9 +284,9 @@ window.Quarto = {
   <li><a href="#launch-training-with-torchtrainer" id="toc-launch-training-with-torchtrainer" class="nav-link" data-scroll-target="#launch-training-with-torchtrainer">5. Launch Training with TorchTrainer</a></li>
   <li><a href="#load-and-use-checkpoints" id="toc-load-and-use-checkpoints" class="nav-link" data-scroll-target="#load-and-use-checkpoints">6. Load and Use Checkpoints</a></li>
   </ul></li>
-  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
-  <li><a href="#references-further-resources" id="toc-references-further-resources" class="nav-link" data-scroll-target="#references-further-resources">References &amp; Further Resources</a></li>
   </ul></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
   </ul>
 </nav>
     </div>
@@ -2275,15 +2275,16 @@ Your browser does not support the video tag. </video> <br> <em>Distributed Train
 </p>
 </section>
 </section>
-<section id="conclusion" class="level2">
-<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
+</section>
+<section id="conclusion" class="level1">
+<h1>Conclusion</h1>
 <p>Distributed training from scratch is often perceived as a complex and challenging endeavor, especially when it comes to configuring multiple GPUs and orchestrating communication between workers. However, modern open-source frameworks such as <strong>Ray Train</strong>, together with robust PyTorch features like <strong>FSDP</strong>, have significantly lowered the barrier to scalable, efficient distributed deep learning. In this blog, we walked through a step-by-step workflow for setting up a distributed training pipeline to fine-tune a model on multiple GPUs, leveraging Ray Train for orchestration and PyTorch FSDP for efficient memory and communication management.</p>
 <p>By utilizing <strong>Ray’s</strong> high-level abstractions, we are able to streamline the engineering process, eliminate much of the boilerplate involved in custom distributed training, and gain access to valuable capabilities such as experiment tracking, fault tolerance, and automatic checkpointing. <strong>Ray’s</strong> scaling configurations allow us to harness all available compute resources, whether just a few or dozens of GPUs, while its dashboard provides clear visibility into resource utilization and training progress in real-time.</p>
 <p>In this blog, we mostly talk about <code>Data Parallelism (DP)</code> technique for scaling training to multiple GPUs. But for tackling even more demanding tasks with extremely large models and datasets, there are additional and more advanced techniques available. Strategies such as <code>Pipeline Parallelism</code>, <code>Tensor Parallelism</code>, and <code>Sequence Parallelism</code> have become key components in scaling deep learning to the frontier level. These methods allow models to be split across layers, parameters, or computation steps, enabling efficient training across clusters of GPUs.</p>
 <p>Emerging practices in hybrid sharding, mixed precision, model offloading, and asynchronous optimization further push the boundaries of what is possible, empowering researchers and engineers to experiment at ever-increasing scales while managing resource and memory efficiency. Maybe in some future blog, we will discuss these advanced techniques in more detail (as I learn them :)).</p>
 </section>
-<section id="references-further-resources" class="level2">
-<h2 class="anchored" data-anchor-id="references-further-resources">References &amp; Further Resources</h2>
+<section id="references" class="level1">
+<h1>References</h1>
 <ul>
 <li>Anyscale and Ray
 <ul>
@@ -2312,7 +2313,6 @@ Your browser does not support the video tag. </video> <br> <em>Distributed Train
 </ul>
 
 
-</section>
 </section>
 
 </main> <!-- /main -->
