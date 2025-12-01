@@ -53,7 +53,7 @@ In this blog post, we'll explore distributed training from the ground up, learni
 
 As I mentioned, I’m still in the first epoch of my distributed training journey! And as I learn more shall keep updating this writeup.
 
-Before I dive in, I’d like to thank some of the brilliant minds, mentors, and friends who’ve helped me along the way: **Prof. Tanmoy Chakraborty**, **Dr. Yatin Nandwani**, **Prof. Song Han**, my mentor **Rohan Shravan** (for his exceptional teaching and guidance over the years), and friends/colleagues like **Dipankar Ranjan Baisya**, **Chris Fregly**, **Zachary Mueller**, **Ram Mohan**, **Debanjan Saha**, and **Siddhant Gupta**. 
+Before I dive in, I’d like to thank some of the brilliant minds, mentors, and friends who’ve helped me along the way: **[Prof. Tanmoy Chakraborty](https://www.linkedin.com/in/tanmoy-chakraborty-89553324/)**, **[Dr. Yatin Nandwani](https://www.linkedin.com/in/yatinnandwani/)**, **[Prof. Song Han](https://hanlab.mit.edu/songhan)**, my mentor and teacher **[Rohan Shravan](https://www.linkedin.com/in/rohanshravan/)** (for his exceptional teaching and guidance over the years), and friends/colleagues **[Dipankar Ranjan Baisya](https://www.linkedin.com/in/dbaisya/)**, **[Chris Fregly](https://www.linkedin.com/in/cfregly/)**, **[Zachary Mueller](https://www.linkedin.com/in/zachary-mueller-135257118/)**, **[Ram Mohan](https://www.linkedin.com/in/1024-m/)**, **[Debanjan Saha](https://www.linkedin.com/in/debanjanaiml/)**, and **[Siddhant Gupta](https://www.linkedin.com/in/sidworks01/)**. 
 
 Most of the content here is inspired by their work, lectures, and advice. All references and resources are at the end of this post.
 
@@ -1883,6 +1883,7 @@ Emerging practices in hybrid sharding, mixed precision, model offloading, and as
   - [TinyML and Efficient Deep Learning Computing [MIT]](https://hanlab.mit.edu/courses/2024-fall-65940)
   - [Training LLMs on GPU Clusters](https://huggingface.co/spaces/nanotron/ultrascale-playbook?section=high-level_overview)
   - [CS231N Lecture 11, Large Scale Distributed Training](https://www.youtube.com/watch?v=9MvD-XsowsE&t=1068s)
+  - [AI Systems Performance Engineering](https://www.amazon.com/Systems-Performance-Engineering-Optimizing-Inference/dp/B0F47689K8/) 
 
 - LLM and Advance Deep Learning
   - [The School of AI](https://theschoolof.ai/)
