@@ -1877,6 +1877,7 @@ Emerging practices in hybrid sharding, mixed precision, model offloading, and as
 
 - Anyscale and Ray
   - [Getting Started with Ray on Anyscale](https://console.anyscale.com/register/v2)
+  - [Ray Train Specialization Learning Path](https://courses.anyscale.com/bundles/ray-train-special)
 
 - Distributed Training 
   - [Advanced Large Language Models [IIT Delhi]](https://lcs2.in/llm2501)
