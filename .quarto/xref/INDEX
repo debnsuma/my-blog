@@ -34,5 +34,8 @@
   },
   "posts/distributed-training-from-scratch/assets/Ray_Train.ipynb": {
     "Ray_Train.html": "0014e12b"
+  },
+  "posts/fsdp-ray-train/index.qmd": {
+    "index.html": "0397170a"
   }
 }

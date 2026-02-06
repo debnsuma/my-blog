@@ -3,7 +3,7 @@ title: "Inside FSDP with PyTorch and Ray: Scaling Model Training with Fully Shar
 author: "Suman Debnath"
 date: "2026-02-06"
 categories: [distributed-training, deep-learning, ray, pytorch, fsdp, deepspeed, fine-tuning, qwen3-tts]
-image: "assets/fsdp_intro.png"
+image: "assets/FSDP-sum.png"
 toc: true
 description: "A deep dive into FSDP internals with visual walkthroughs, hands-on implementation with Ray, PyTorch and DeepSpeed, and finally training a fine-tuned voice cloning model using 1.7B parameter Qwen3-TTS to clone your own voice."
 ---

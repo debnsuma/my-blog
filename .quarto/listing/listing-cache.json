@@ -1,6 +1,7 @@
 {
   "listingMap": {
     "index.qmd": [
+      "posts/fsdp-ray-train/index.qmd",
       "posts/distributed-training-from-scratch/index.qmd"
     ]
   }
