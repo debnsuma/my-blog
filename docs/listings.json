@@ -2,6 +2,7 @@
   {
     "listing": "/index.html",
     "items": [
+      "/posts/fsdp-ray-train/index.html",
       "/posts/distributed-training-from-scratch/index.html"
     ]
   }
