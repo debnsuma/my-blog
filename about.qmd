@@ -16,4 +16,4 @@ about:
 
 ---
 
-TBA
+Suman Debnath is the Director of Developer Relations and Product at Crusoe, where he focuses on AI infrastructure and managed inference. Prior to joining Crusoe, he served as a Technical Lead and Principal Developer Advocate (ML) at Anyscale and AWS, where he worked closely with developer communities to advance the adoption of machine learning at scale.

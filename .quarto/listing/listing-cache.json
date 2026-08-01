@@ -1,6 +1,7 @@
 {
   "listingMap": {
     "index.qmd": [
+      "posts/lora-serverless-fine-tuning/index.qmd",
       "posts/fsdp-ray-train/index.qmd",
       "posts/distributed-training-from-scratch/index.qmd"
     ]

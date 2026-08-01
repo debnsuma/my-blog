@@ -2,6 +2,7 @@
   {
     "listing": "/index.html",
     "items": [
+      "/posts/lora-serverless-fine-tuning/index.html",
       "/posts/fsdp-ray-train/index.html",
       "/posts/distributed-training-from-scratch/index.html"
     ]

@@ -2,18 +2,22 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://debnsuma.github.io/my-blog/about.html</loc>
-    <lastmod>2026-02-01T02:29:01.378Z</lastmod>
+    <lastmod>2026-07-31T23:45:24.035Z</lastmod>
   </url>
   <url>
     <loc>https://debnsuma.github.io/my-blog/posts/distributed-training-from-scratch/index.html</loc>
-    <lastmod>2026-02-01T02:29:01.476Z</lastmod>
+    <lastmod>2026-07-29T19:24:20.940Z</lastmod>
   </url>
   <url>
     <loc>https://debnsuma.github.io/my-blog/posts/fsdp-ray-train/index.html</loc>
-    <lastmod>2026-02-06T08:46:40.763Z</lastmod>
+    <lastmod>2026-07-29T19:28:21.500Z</lastmod>
+  </url>
+  <url>
+    <loc>https://debnsuma.github.io/my-blog/posts/lora-serverless-fine-tuning/index.html</loc>
+    <lastmod>2026-07-31T23:59:52.130Z</lastmod>
   </url>
   <url>
     <loc>https://debnsuma.github.io/my-blog/index.html</loc>
-    <lastmod>2026-02-06T08:37:26.516Z</lastmod>
+    <lastmod>2026-07-29T20:36:19.202Z</lastmod>
   </url>
 </urlset>

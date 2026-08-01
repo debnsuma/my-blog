@@ -3,6 +3,7 @@ title: "My Blog"
 listing:
   - id: posts
     contents:
+      - posts/lora-serverless-fine-tuning/index.qmd
       - posts/fsdp-ray-train/index.qmd
       - posts/distributed-training-from-scratch/index.qmd
     type: default

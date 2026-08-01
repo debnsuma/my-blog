@@ -37,5 +37,8 @@
   },
   "posts/fsdp-ray-train/index.qmd": {
     "index.html": "0397170a"
+  },
+  "posts/lora-serverless-fine-tuning/index.qmd": {
+    "index.html": "f2e5162b"
   }
 }
