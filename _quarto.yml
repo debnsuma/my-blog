@@ -6,6 +6,8 @@ website:
   description: "A blog built with Quarto"
   site-url: https://debnsuma.github.io/my-blog
   title: "My Blog"
+  open-graph: true
+  twitter-card: true
   navbar:
     right:
       - about.qmd

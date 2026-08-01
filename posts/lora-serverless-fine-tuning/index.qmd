@@ -3,7 +3,7 @@ title: "Fine-Tuning from First Principles: LoRA, QLoRA, and Serverless Fine-Tuni
 author: "Suman Debnath"
 date: "2026-07-30"
 categories: [fine-tuning, lora, qlora, quantization, peft, llm, deep-learning, crusoe]
-image: "assets/pii-redaction-pipeline.svg"
+image: "assets/pii-redaction-pipeline.png"
 toc: true
 description: "A ground-up journey into fine-tuning LLMs, where we build quantization and LoRA from scratch in plain PyTorch, combine them into QLoRA, and finally fine-tune Qwen3-8B into a PII redaction engine that outperforms a 70B model, using Crusoe's Serverless Fine-Tuning."
 ---
